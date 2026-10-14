@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -38,6 +39,11 @@ import mx.finanzas.pareja.ui.cards.CardsScreen
 import mx.finanzas.pareja.ui.cards.CardsViewModel
 import mx.finanzas.pareja.ui.dashboard.DashboardScreen
 import mx.finanzas.pareja.ui.dashboard.DashboardViewModel
+import java.util.UUID
+import mx.finanzas.pareja.ui.payments.ManualPaymentFormViewModel
+import mx.finanzas.pareja.ui.payments.ManualPaymentsViewModel
+import mx.finanzas.pareja.ui.payments.PaymentFormScreen
+import mx.finanzas.pareja.ui.payments.PaymentsScreen
 import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.transactions.TransactionFormScreen
 import mx.finanzas.pareja.ui.transactions.TransactionFormViewModel
@@ -51,7 +57,9 @@ private const val ROUTE_DASHBOARD = "dashboard"
 private const val ROUTE_TRANSACTIONS = "transactions"
 private const val ROUTE_CARDS = "cards"
 private const val ROUTE_ACCOUNT = "account"
+private const val ROUTE_PAYMENTS = "payments"
 private const val ROUTE_FORM = "tx_form?id={id}"
+private const val ROUTE_PAYMENT_FORM = "payment_form?id={id}"
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
@@ -59,6 +67,7 @@ private val TABS = listOf(
     Tab(ROUTE_DASHBOARD, "Resumen", Icons.Filled.Dashboard),
     Tab(ROUTE_TRANSACTIONS, "Gastos", Icons.AutoMirrored.Filled.ReceiptLong),
     Tab(ROUTE_CARDS, "Tarjetas", Icons.Filled.CreditCard),
+    Tab(ROUTE_PAYMENTS, "Pagos", Icons.Filled.Payments),
     Tab(ROUTE_ACCOUNT, "Cuenta", Icons.Filled.Person),
 )
 
@@ -138,6 +147,48 @@ fun MainScaffold(
                     memberNames = names,
                     openAddOnStart = false,
                     onChanged = { refreshKey++ },
+                )
+            }
+            composable(ROUTE_PAYMENTS) {
+                val vm: ManualPaymentsViewModel = viewModel(
+                    factory = viewModelFactory { ManualPaymentsViewModel(repo, userId, today(), MEXICO_CITY) },
+                )
+                PaymentsScreen(
+                    vm = vm,
+                    userId = userId,
+                    memberNames = names,
+                    zone = MEXICO_CITY,
+                    refreshKey = refreshKey,
+                    onNew = { nav.navigate("payment_form") },
+                    onEdit = { id -> nav.navigate("payment_form?id=$id") },
+                )
+            }
+            composable(
+                route = ROUTE_PAYMENT_FORM,
+                arguments = listOf(
+                    navArgument("id") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                val editingId = entry.arguments?.getString("id")
+                val vm: ManualPaymentFormViewModel = viewModel(
+                    factory = viewModelFactory {
+                        ManualPaymentFormViewModel(
+                            repo = repo, userId = userId, householdId = householdId, editingId = editingId,
+                            today = today(), zone = MEXICO_CITY, newFileId = { UUID.randomUUID().toString() },
+                        )
+                    },
+                )
+                PaymentFormScreen(
+                    vm = vm,
+                    zone = MEXICO_CITY,
+                    onDone = { saved ->
+                        if (saved) refreshKey++
+                        nav.popBackStack()
+                    },
                 )
             }
             composable(ROUTE_ACCOUNT) {

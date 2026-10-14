@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.data
 
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -135,4 +136,56 @@ data class TransactionPatch(
     val installments: Int?,
     @SerialName("installment_number") val installmentNumber: Int?,
     val notes: String?,
+)
+
+@Serializable
+enum class PaymentMethod {
+    @SerialName("cash") CASH,
+    @SerialName("transfer") TRANSFER,
+}
+
+/** Pago en efectivo o transferencia, con evidencia opcional (ruta en el bucket `evidence`). */
+@Serializable
+data class ManualPayment(
+    val id: String,
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    val method: PaymentMethod,
+    val amount: Double,
+    @SerialName("paid_at") val paidAt: Instant,
+    val concept: String,
+    val counterparty: String? = null,
+    val reference: String? = null,
+    @SerialName("category_id") val categoryId: String? = null,
+    val notes: String? = null,
+    @SerialName("evidence_path") val evidencePath: String? = null,
+)
+
+@Serializable
+data class NewManualPayment(
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    val method: PaymentMethod,
+    val amount: Double,
+    @SerialName("paid_at") val paidAt: Instant,
+    val concept: String,
+    val counterparty: String? = null,
+    val reference: String? = null,
+    @SerialName("category_id") val categoryId: String? = null,
+    val notes: String? = null,
+    @SerialName("evidence_path") val evidencePath: String? = null,
+)
+
+/** Edición completa (sin valores por defecto: los null se envían para poder limpiar campos). */
+@Serializable
+data class ManualPaymentPatch(
+    val method: PaymentMethod,
+    val amount: Double,
+    @SerialName("paid_at") val paidAt: Instant,
+    val concept: String,
+    val counterparty: String?,
+    val reference: String?,
+    @SerialName("category_id") val categoryId: String?,
+    val notes: String?,
+    @SerialName("evidence_path") val evidencePath: String?,
 )

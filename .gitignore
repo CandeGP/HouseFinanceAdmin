@@ -1,0 +1,8 @@
+# Ejemplos reales de cobros/estados de cuenta: contienen datos personales, nunca al repo
+samples/
+
+node_modules/
+.DS_Store
+Thumbs.db
+.env
+.env.*

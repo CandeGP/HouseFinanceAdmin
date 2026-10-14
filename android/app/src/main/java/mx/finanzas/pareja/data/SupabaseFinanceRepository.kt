@@ -9,6 +9,11 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.storage.Storage
+import io.github.jan.supabase.storage.storage
+import io.ktor.http.ContentType
+import kotlin.time.Duration.Companion.hours
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -17,6 +22,7 @@ fun createSupabase(url: String, key: String): SupabaseClient =
     createSupabaseClient(supabaseUrl = url, supabaseKey = key) {
         install(Auth)
         install(Postgrest)
+        install(Storage)
     }
 
 class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRepository {
@@ -136,5 +142,56 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         client.postgrest.from("transactions").delete {
             filter { eq("id", id) }
         }
+    }
+
+    // ---- Pagos en efectivo / transferencia
+    override suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment> =
+        client.postgrest.from("manual_payments").select {
+            filter {
+                gte("paid_at", from.toString())
+                lt("paid_at", toExclusive.toString())
+            }
+            order("paid_at", Order.DESCENDING)
+        }.decodeList<ManualPayment>()
+
+    override suspend fun manualPayment(id: String): ManualPayment? =
+        client.postgrest.from("manual_payments").select {
+            filter { eq("id", id) }
+        }.decodeList<ManualPayment>().firstOrNull()
+
+    override suspend fun addManualPayment(payment: NewManualPayment) {
+        client.postgrest.from("manual_payments").insert(payment)
+    }
+
+    override suspend fun updateManualPayment(id: String, patch: ManualPaymentPatch) {
+        client.postgrest.from("manual_payments").update(patch) {
+            filter { eq("id", id) }
+        }
+    }
+
+    override suspend fun deleteManualPayment(id: String) {
+        client.postgrest.from("manual_payments").delete {
+            filter { eq("id", id) }
+        }
+    }
+
+    // ---- Evidencias
+    override suspend fun uploadEvidence(path: String, bytes: ByteArray, mimeType: String) {
+        client.storage.from(EVIDENCE_BUCKET).upload(path, bytes) {
+            upsert = false
+            contentType = ContentType.parse(mimeType)
+        }
+    }
+
+    override suspend fun deleteEvidence(path: String) {
+        client.storage.from(EVIDENCE_BUCKET).delete(path)
+    }
+
+    override suspend fun evidenceUrl(path: String): String =
+        client.storage.from(EVIDENCE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
+
+    private companion object {
+        const val EVIDENCE_BUCKET = "evidence"
+        val SIGNED_URL_TTL = 1.hours
     }
 }

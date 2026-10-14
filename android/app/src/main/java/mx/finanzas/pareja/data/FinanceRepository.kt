@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.data
 
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -46,4 +47,18 @@ interface FinanceRepository {
     suspend fun addTransaction(tx: NewTransaction)
     suspend fun updateTransaction(id: String, patch: TransactionPatch)
     suspend fun deleteTransaction(id: String)
+
+    // Pagos en efectivo / transferencia
+    suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment>
+    suspend fun manualPayment(id: String): ManualPayment?
+    suspend fun addManualPayment(payment: NewManualPayment)
+    suspend fun updateManualPayment(id: String, patch: ManualPaymentPatch)
+    suspend fun deleteManualPayment(id: String)
+
+    // Evidencias (bucket privado `evidence`)
+    suspend fun uploadEvidence(path: String, bytes: ByteArray, mimeType: String)
+    suspend fun deleteEvidence(path: String)
+
+    /** URL firmada y temporal para ver una evidencia. */
+    suspend fun evidenceUrl(path: String): String
 }

@@ -1,6 +1,10 @@
 package mx.finanzas.pareja
 
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import mx.finanzas.pareja.data.ManualPayment
+import mx.finanzas.pareja.data.ManualPaymentPatch
+import mx.finanzas.pareja.data.NewManualPayment
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.CardPatch
 import mx.finanzas.pareja.data.Category
@@ -104,4 +108,45 @@ class FakeFinanceRepository : FinanceRepository {
         deletedTransactions += id
         txList.removeAll { it.id == id }
     }
+
+    // ---- Pagos manuales y evidencias
+    var paymentList: MutableList<ManualPayment> = mutableListOf()
+    val addedPayments = mutableListOf<NewManualPayment>()
+    val updatedPayments = mutableListOf<Pair<String, ManualPaymentPatch>>()
+    val deletedPayments = mutableListOf<String>()
+    val uploadedEvidence = mutableListOf<Triple<String, Int, String>>() // path, bytes, mime
+    val deletedEvidence = mutableListOf<String>()
+    var lastPaymentRange: Pair<Instant, Instant>? = null
+
+    override suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment> {
+        lastPaymentRange = from to toExclusive
+        return paymentList.filter { it.paidAt >= from && it.paidAt < toExclusive }
+    }
+
+    override suspend fun manualPayment(id: String): ManualPayment? = paymentList.firstOrNull { it.id == id }
+
+    override suspend fun addManualPayment(payment: NewManualPayment) {
+        failIfNeeded()
+        addedPayments += payment
+    }
+
+    override suspend fun updateManualPayment(id: String, patch: ManualPaymentPatch) {
+        failIfNeeded()
+        updatedPayments += id to patch
+    }
+
+    override suspend fun deleteManualPayment(id: String) {
+        deletedPayments += id
+        paymentList.removeAll { it.id == id }
+    }
+
+    override suspend fun uploadEvidence(path: String, bytes: ByteArray, mimeType: String) {
+        uploadedEvidence += Triple(path, bytes.size, mimeType)
+    }
+
+    override suspend fun deleteEvidence(path: String) {
+        deletedEvidence += path
+    }
+
+    override suspend fun evidenceUrl(path: String): String = "https://signed.test/$path"
 }
