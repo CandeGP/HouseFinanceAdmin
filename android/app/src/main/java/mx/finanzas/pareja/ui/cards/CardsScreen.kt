@@ -103,6 +103,13 @@ fun CardsScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                    if (card.altLast4.isNotEmpty()) {
+                                        Text(
+                                            "También aparece como: " + card.altLast4.joinToString { "•••• $it" },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                     Text(
                                         "Corte día ${card.cutoffDay} · Pago día ${card.dueDay} · " +
                                             "Límite ${formatMxn(card.creditLimit)}",

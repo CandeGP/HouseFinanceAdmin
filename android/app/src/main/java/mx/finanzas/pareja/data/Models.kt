@@ -59,6 +59,8 @@ data class Card(
     @SerialName("due_day") val dueDay: Int,
     val color: String? = null,
     val archived: Boolean = false,
+    /** Otros últimos 4 con los que aparece la tarjeta (digital, virtual o Google Wallet). */
+    @SerialName("alt_last4") val altLast4: List<String> = emptyList(),
 )
 
 @Serializable
@@ -144,14 +146,6 @@ data class IngestResult(
     @SerialName("tx_id") val txId: String,
     val duplicate: Boolean,
     @SerialName("resolved_card_id") val resolvedCardId: String? = null,
-)
-
-/** Confirmación desde la bandeja: asigna tarjeta/categoría y pasa a `confirmed`. */
-@Serializable
-data class ConfirmPatch(
-    val status: TxStatus,
-    @SerialName("card_id") val cardId: String?,
-    @SerialName("category_id") val categoryId: String?,
 )
 
 @Serializable

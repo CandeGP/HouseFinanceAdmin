@@ -173,12 +173,16 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
             order("captured_at", Order.DESCENDING)
         }.decodeList<Transaction>()
 
+    /** Confirma el cobro; el servidor además aprende el alias de últimos 4 de la tarjeta. */
     override suspend fun confirmTransaction(id: String, cardId: String, categoryId: String?) {
-        client.postgrest.from("transactions").update(
-            ConfirmPatch(status = TxStatus.CONFIRMED, cardId = cardId, categoryId = categoryId),
-        ) {
-            filter { eq("id", id) }
-        }
+        client.postgrest.rpc(
+            "confirm_capture",
+            buildJsonObject {
+                put("p_tx", id)
+                put("p_card", cardId)
+                put("p_category", categoryId)
+            },
+        )
     }
 
     // ---- Pagos en efectivo / transferencia
