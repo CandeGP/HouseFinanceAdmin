@@ -10,6 +10,17 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <!-- Lectura de notificaciones de Billetera de Google y Plata (requiere permiso manual del usuario) -->
+        <service
+            android:name=".capture.CaptureService"
+            android:exported="true"
+            android:label="Finanzas"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

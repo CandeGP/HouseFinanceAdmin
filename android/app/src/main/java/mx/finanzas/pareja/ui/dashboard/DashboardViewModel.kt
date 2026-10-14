@@ -23,6 +23,8 @@ data class DashboardUiState(
     val scope: Scope = Scope.BOTH,
     val summary: DashboardSummary = buildDashboard(emptyList()),
     val error: String? = null,
+    /** Cobros capturados automáticamente que esperan revisión. */
+    val pendingCount: Int = 0,
 )
 
 class DashboardViewModel(
@@ -47,6 +49,9 @@ class DashboardViewModel(
                 allViews = repo.cards()
                     .filterNot { it.archived }
                     .mapNotNull { card -> repo.cycleEstimate(card.id, ref)?.let { CardCycleView(card, it) } }
+                val pending = runCatching { repo.pendingTransactions().count { it.ownerId == userId } }
+                    .getOrDefault(0)
+                _state.update { it.copy(pendingCount = pending) }
                 publish(loading = false)
             } catch (e: CancellationException) {
                 throw e

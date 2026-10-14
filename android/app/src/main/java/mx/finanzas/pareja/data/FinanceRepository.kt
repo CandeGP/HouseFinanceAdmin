@@ -48,6 +48,20 @@ interface FinanceRepository {
     suspend fun updateTransaction(id: String, patch: TransactionPatch)
     suspend fun deleteTransaction(id: String)
 
+    // Captura automática y bandeja de revisión
+    suspend fun ingestCapture(
+        householdId: String,
+        merchant: String,
+        amount: Double,
+        capturedAt: Instant,
+        cardLast4: String?,
+        source: TxSource,
+        raw: String?,
+    ): IngestResult
+
+    suspend fun pendingTransactions(): List<Transaction>
+    suspend fun confirmTransaction(id: String, cardId: String, categoryId: String?)
+
     // Pagos en efectivo / transferencia
     suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment>
     suspend fun manualPayment(id: String): ManualPayment?

@@ -34,6 +34,7 @@ fun DashboardScreen(
     memberNames: Map<String, String>,
     refreshKey: Int,
     onAddCard: () -> Unit,
+    onOpenInbox: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(refreshKey) { if (refreshKey > 0) vm.load() }
@@ -48,6 +49,20 @@ fun DashboardScreen(
             ScopeToggle(scope = state.scope, onChange = vm::setScope)
         }
         ErrorText(state.error, Modifier.padding(horizontal = 16.dp))
+
+        if (state.pendingCount > 0) {
+            Card(
+                onClick = onOpenInbox,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    "${state.pendingCount} cobro(s) detectado(s) por revisar",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+        }
 
         when {
             state.loading && state.summary.ranking.isEmpty() ->

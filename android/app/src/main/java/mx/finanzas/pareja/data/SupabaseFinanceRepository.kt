@@ -144,6 +144,43 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         }
     }
 
+    // ---- Captura automática
+    override suspend fun ingestCapture(
+        householdId: String,
+        merchant: String,
+        amount: Double,
+        capturedAt: Instant,
+        cardLast4: String?,
+        source: TxSource,
+        raw: String?,
+    ): IngestResult =
+        client.postgrest.rpc(
+            "ingest_capture",
+            buildJsonObject {
+                put("p_household", householdId)
+                put("p_merchant", merchant)
+                put("p_amount", amount)
+                put("p_captured_at", capturedAt.toString())
+                put("p_card_last4", cardLast4)
+                put("p_source", source.wireName)
+                put("p_raw", raw)
+            },
+        ).decodeList<IngestResult>().first()
+
+    override suspend fun pendingTransactions(): List<Transaction> =
+        client.postgrest.from("transactions").select {
+            filter { eq("status", "pending_review") }
+            order("captured_at", Order.DESCENDING)
+        }.decodeList<Transaction>()
+
+    override suspend fun confirmTransaction(id: String, cardId: String, categoryId: String?) {
+        client.postgrest.from("transactions").update(
+            ConfirmPatch(status = TxStatus.CONFIRMED, cardId = cardId, categoryId = categoryId),
+        ) {
+            filter { eq("id", id) }
+        }
+    }
+
     // ---- Pagos en efectivo / transferencia
     override suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment> =
         client.postgrest.from("manual_payments").select {

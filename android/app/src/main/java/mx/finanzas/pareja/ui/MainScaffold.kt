@@ -41,6 +41,8 @@ import mx.finanzas.pareja.ui.cards.CardsViewModel
 import mx.finanzas.pareja.ui.dashboard.DashboardScreen
 import mx.finanzas.pareja.ui.dashboard.DashboardViewModel
 import java.util.UUID
+import mx.finanzas.pareja.ui.inbox.InboxScreen
+import mx.finanzas.pareja.ui.inbox.InboxViewModel
 import mx.finanzas.pareja.ui.payments.ManualPaymentFormViewModel
 import mx.finanzas.pareja.ui.payments.ManualPaymentsViewModel
 import mx.finanzas.pareja.ui.payments.PaymentFormScreen
@@ -59,6 +61,7 @@ private const val ROUTE_TRANSACTIONS = "transactions"
 private const val ROUTE_CARDS = "cards"
 private const val ROUTE_ACCOUNT = "account"
 private const val ROUTE_PAYMENTS = "payments"
+private const val ROUTE_INBOX = "inbox"
 private const val ROUTE_FORM = "tx_form?id={id}"
 private const val ROUTE_PAYMENT_FORM = "payment_form?id={id}"
 
@@ -123,7 +126,14 @@ fun MainScaffold(
                     memberNames = names,
                     refreshKey = refreshKey,
                     onAddCard = { nav.navigate(ROUTE_CARDS) },
+                    onOpenInbox = { nav.navigate(ROUTE_INBOX) },
                 )
+            }
+            composable(ROUTE_INBOX) {
+                val vm: InboxViewModel = viewModel(
+                    factory = viewModelFactory { InboxViewModel(repo, userId) },
+                )
+                InboxScreen(vm = vm, onBack = { nav.popBackStack() }, onChanged = { refreshKey++ })
             }
             composable(ROUTE_TRANSACTIONS) {
                 val vm: TransactionsViewModel = viewModel(

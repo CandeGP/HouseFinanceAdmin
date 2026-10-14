@@ -12,11 +12,11 @@ enum class PaymentMode {
 }
 
 @Serializable
-enum class TxSource {
-    @SerialName("manual") MANUAL,
-    @SerialName("notification") NOTIFICATION,
-    @SerialName("email") EMAIL,
-    @SerialName("statement") STATEMENT,
+enum class TxSource(val wireName: String) {
+    @SerialName("manual") MANUAL("manual"),
+    @SerialName("notification") NOTIFICATION("notification"),
+    @SerialName("email") EMAIL("email"),
+    @SerialName("statement") STATEMENT("statement"),
 }
 
 @Serializable
@@ -136,6 +136,22 @@ data class TransactionPatch(
     val installments: Int?,
     @SerialName("installment_number") val installmentNumber: Int?,
     val notes: String?,
+)
+
+/** Resultado de la RPC `ingest_capture`. */
+@Serializable
+data class IngestResult(
+    @SerialName("tx_id") val txId: String,
+    val duplicate: Boolean,
+    @SerialName("resolved_card_id") val resolvedCardId: String? = null,
+)
+
+/** Confirmación desde la bandeja: asigna tarjeta/categoría y pasa a `confirmed`. */
+@Serializable
+data class ConfirmPatch(
+    val status: TxStatus,
+    @SerialName("card_id") val cardId: String?,
+    @SerialName("category_id") val categoryId: String?,
 )
 
 @Serializable

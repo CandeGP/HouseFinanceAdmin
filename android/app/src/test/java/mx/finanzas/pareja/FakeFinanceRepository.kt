@@ -14,8 +14,11 @@ import mx.finanzas.pareja.data.Member
 import mx.finanzas.pareja.data.MemberRole
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.NewTransaction
+import mx.finanzas.pareja.data.IngestResult
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TransactionPatch
+import mx.finanzas.pareja.data.TxSource
+import mx.finanzas.pareja.data.TxStatus
 
 /** Doble en memoria de FinanceRepository, con registro de las escrituras. */
 class FakeFinanceRepository : FinanceRepository {
@@ -107,6 +110,32 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun deleteTransaction(id: String) {
         deletedTransactions += id
         txList.removeAll { it.id == id }
+    }
+
+    // ---- Captura automática
+    data class IngestCall(
+        val householdId: String, val merchant: String, val amount: Double,
+        val capturedAt: Instant, val cardLast4: String?, val source: TxSource, val raw: String?,
+    )
+
+    val ingestCalls = mutableListOf<IngestCall>()
+    val confirmedTransactions = mutableListOf<Triple<String, String, String?>>() // id, cardId, categoryId
+
+    override suspend fun ingestCapture(
+        householdId: String, merchant: String, amount: Double, capturedAt: Instant,
+        cardLast4: String?, source: TxSource, raw: String?,
+    ): IngestResult {
+        failIfNeeded()
+        ingestCalls += IngestCall(householdId, merchant, amount, capturedAt, cardLast4, source, raw)
+        return IngestResult(txId = "tx-${ingestCalls.size}", duplicate = false, resolvedCardId = null)
+    }
+
+    override suspend fun pendingTransactions(): List<Transaction> =
+        txList.filter { it.status == TxStatus.PENDING_REVIEW }
+
+    override suspend fun confirmTransaction(id: String, cardId: String, categoryId: String?) {
+        failIfNeeded()
+        confirmedTransactions += Triple(id, cardId, categoryId)
     }
 
     // ---- Pagos manuales y evidencias
