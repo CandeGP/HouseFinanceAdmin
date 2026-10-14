@@ -33,6 +33,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.FinanceRepository
+import mx.finanzas.pareja.domain.timeText
 import mx.finanzas.pareja.ui.account.AccountScreen
 import mx.finanzas.pareja.ui.account.AccountViewModel
 import mx.finanzas.pareja.ui.cards.CardsScreen
@@ -179,6 +180,7 @@ fun MainScaffold(
                         ManualPaymentFormViewModel(
                             repo = repo, userId = userId, householdId = householdId, editingId = editingId,
                             today = today(), zone = MEXICO_CITY, newFileId = { UUID.randomUUID().toString() },
+                            initialTime = timeText(Clock.System.now(), MEXICO_CITY),
                         )
                     },
                 )

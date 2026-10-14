@@ -56,8 +56,11 @@ class ManualPaymentFormViewModel(
     today: LocalDate,
     private val zone: TimeZone,
     private val newFileId: () -> String,
+    initialTime: String = "",
 ) : ViewModel() {
-    private val _state = MutableStateFlow(PaymentFormUiState(draft = ManualPaymentDraft(date = today)))
+    private val _state = MutableStateFlow(
+        PaymentFormUiState(draft = ManualPaymentDraft(date = today, timeText = initialTime)),
+    )
     val state: StateFlow<PaymentFormUiState> = _state.asStateFlow()
 
     val isEditing: Boolean get() = editingId != null
