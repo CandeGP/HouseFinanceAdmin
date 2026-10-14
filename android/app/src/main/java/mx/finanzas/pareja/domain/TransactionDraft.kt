@@ -69,8 +69,9 @@ data class TransactionDraft(
             } else {
                 val rawNumber = installmentNumberText.trim()
                 installmentNumber = if (rawNumber.isEmpty()) 1 else rawNumber.toIntOrNull()
-                if (installmentNumber == null || installmentNumber !in 1..installments) {
-                    errors[DraftField.INSTALLMENT_NUMBER] = "Debe estar entre 1 y $installments"
+                // 0 = la primera mensualidad cae en el corte siguiente (algunos bancos, p. ej. Plata).
+                if (installmentNumber == null || installmentNumber !in 0..installments) {
+                    errors[DraftField.INSTALLMENT_NUMBER] = "Debe estar entre 0 y $installments"
                 }
             }
         }

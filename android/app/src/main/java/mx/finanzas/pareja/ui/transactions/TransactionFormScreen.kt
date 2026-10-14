@@ -162,7 +162,7 @@ fun TransactionFormScreen(vm: TransactionFormViewModel, onDone: (saved: Boolean)
                 OutlinedTextField(
                     value = draft.installmentNumberText,
                     onValueChange = { vm.onDraftChange(draft.copy(installmentNumberText = it)) },
-                    label = { Text("¿En qué mensualidad va? (vacío = la 1)") },
+                    label = { Text("¿En qué mensualidad va? (vacío = 1, 0 = empieza el corte siguiente)") },
                     singleLine = true,
                     enabled = !state.readOnly,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

@@ -62,6 +62,14 @@ interface FinanceRepository {
     suspend fun pendingTransactions(): List<Transaction>
     suspend fun confirmTransaction(id: String, cardId: String, categoryId: String?)
 
+    // Estados de cuenta
+    suspend fun importStatement(
+        cardId: String,
+        summary: StatementImportSummary,
+        movements: List<ImportMovement>,
+        installments: List<ImportInstallment>,
+    ): ImportResult
+
     // Pagos en efectivo / transferencia
     suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment>
     suspend fun manualPayment(id: String): ManualPayment?

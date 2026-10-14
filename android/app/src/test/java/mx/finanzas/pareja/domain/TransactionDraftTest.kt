@@ -105,8 +105,14 @@ class TransactionDraftTest {
     }
 
     @Test
-    fun `msi no permite mensualidad actual menor a uno`() {
-        val errors = invalid(draft(mode = PaymentMode.MSI, installments = "6", installmentNumber = "0"))
+    fun `msi no permite mensualidad actual negativa`() {
+        val errors = invalid(draft(mode = PaymentMode.MSI, installments = "6", installmentNumber = "-1"))
         assertNotNull(errors[DraftField.INSTALLMENT_NUMBER])
+    }
+
+    @Test
+    fun `msi permite mensualidad 0 cuando la primera cae en el corte siguiente`() {
+        val v = valid(draft(mode = PaymentMode.MSI, installments = "6", installmentNumber = "0"))
+        assertEquals(0, v.installmentNumber)
     }
 }

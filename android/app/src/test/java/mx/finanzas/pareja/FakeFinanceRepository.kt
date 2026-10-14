@@ -14,7 +14,11 @@ import mx.finanzas.pareja.data.Member
 import mx.finanzas.pareja.data.MemberRole
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.NewTransaction
+import mx.finanzas.pareja.data.ImportInstallment
+import mx.finanzas.pareja.data.ImportMovement
+import mx.finanzas.pareja.data.ImportResult
 import mx.finanzas.pareja.data.IngestResult
+import mx.finanzas.pareja.data.StatementImportSummary
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TransactionPatch
 import mx.finanzas.pareja.data.TxSource
@@ -136,6 +140,27 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun confirmTransaction(id: String, cardId: String, categoryId: String?) {
         failIfNeeded()
         confirmedTransactions += Triple(id, cardId, categoryId)
+    }
+
+    // ---- Estados de cuenta
+    data class ImportCall(
+        val cardId: String,
+        val summary: StatementImportSummary,
+        val movements: List<ImportMovement>,
+        val installments: List<ImportInstallment>,
+    )
+
+    val importCalls = mutableListOf<ImportCall>()
+
+    override suspend fun importStatement(
+        cardId: String,
+        summary: StatementImportSummary,
+        movements: List<ImportMovement>,
+        installments: List<ImportInstallment>,
+    ): ImportResult {
+        failIfNeeded()
+        importCalls += ImportCall(cardId, summary, movements, installments)
+        return ImportResult(movements.size, installments.size)
     }
 
     // ---- Pagos manuales y evidencias

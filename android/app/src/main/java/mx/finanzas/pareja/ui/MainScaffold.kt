@@ -48,6 +48,8 @@ import mx.finanzas.pareja.ui.payments.ManualPaymentsViewModel
 import mx.finanzas.pareja.ui.payments.PaymentFormScreen
 import mx.finanzas.pareja.ui.payments.PaymentsScreen
 import mx.finanzas.pareja.ui.session.SessionState
+import mx.finanzas.pareja.ui.statements.StatementImportScreen
+import mx.finanzas.pareja.ui.statements.StatementImportViewModel
 import mx.finanzas.pareja.ui.transactions.TransactionFormScreen
 import mx.finanzas.pareja.ui.transactions.TransactionFormViewModel
 import mx.finanzas.pareja.ui.transactions.TransactionsScreen
@@ -62,6 +64,7 @@ private const val ROUTE_CARDS = "cards"
 private const val ROUTE_ACCOUNT = "account"
 private const val ROUTE_PAYMENTS = "payments"
 private const val ROUTE_INBOX = "inbox"
+private const val ROUTE_STATEMENT_IMPORT = "statement_import"
 private const val ROUTE_FORM = "tx_form?id={id}"
 private const val ROUTE_PAYMENT_FORM = "payment_form?id={id}"
 
@@ -158,6 +161,19 @@ fun MainScaffold(
                     memberNames = names,
                     openAddOnStart = false,
                     onChanged = { refreshKey++ },
+                    onImportStatement = { nav.navigate(ROUTE_STATEMENT_IMPORT) },
+                )
+            }
+            composable(ROUTE_STATEMENT_IMPORT) {
+                val vm: StatementImportViewModel = viewModel(
+                    factory = viewModelFactory {
+                        StatementImportViewModel(repo, userId, householdId) { UUID.randomUUID().toString() }
+                    },
+                )
+                StatementImportScreen(
+                    vm = vm,
+                    onBack = { nav.popBackStack() },
+                    onImported = { refreshKey++ },
                 )
             }
             composable(ROUTE_PAYMENTS) {

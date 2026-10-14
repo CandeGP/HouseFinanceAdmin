@@ -15,6 +15,8 @@ import io.ktor.http.ContentType
 import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -185,6 +187,26 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         )
     }
 
+    // ---- Estados de cuenta
+    override suspend fun importStatement(
+        cardId: String,
+        summary: StatementImportSummary,
+        movements: List<ImportMovement>,
+        installments: List<ImportInstallment>,
+    ): ImportResult =
+        client.postgrest.rpc(
+            "import_statement",
+            buildJsonObject {
+                put("p_card", cardId)
+                put("p_statement", wireJson.encodeToJsonElement(StatementImportSummary.serializer(), summary))
+                put("p_movements", wireJson.encodeToJsonElement(ListSerializer(ImportMovement.serializer()), movements))
+                put(
+                    "p_installments",
+                    wireJson.encodeToJsonElement(ListSerializer(ImportInstallment.serializer()), installments),
+                )
+            },
+        ).decodeAs<ImportResult>()
+
     // ---- Pagos en efectivo / transferencia
     override suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment> =
         client.postgrest.from("manual_payments").select {
@@ -232,6 +254,7 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         client.storage.from(EVIDENCE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
 
     private companion object {
+        val wireJson = Json { encodeDefaults = true; explicitNulls = true }
         const val EVIDENCE_BUCKET = "evidence"
         val SIGNED_URL_TTL = 1.hours
     }

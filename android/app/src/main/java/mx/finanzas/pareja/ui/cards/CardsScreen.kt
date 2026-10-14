@@ -22,6 +22,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -50,6 +51,7 @@ fun CardsScreen(
     memberNames: Map<String, String>,
     openAddOnStart: Boolean,
     onChanged: () -> Unit,
+    onImportStatement: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(openAddOnStart) }
@@ -77,6 +79,11 @@ fun CardsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             ErrorText(state.message, Modifier.padding(horizontal = 16.dp))
+
+            OutlinedButton(
+                onClick = onImportStatement,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            ) { Text("Importar estado de cuenta (PDF)") }
 
             if (state.cards.isEmpty() && !state.loading) {
                 EmptyState(
