@@ -1,6 +1,7 @@
 package mx.finanzas.pareja.domain
 
 import java.text.Normalizer
+import kotlin.math.abs
 import kotlinx.datetime.LocalDate
 
 /** Datos de cabecera de un estado de cuenta (formato estándar CONDUSEF de los bancos en México). */
@@ -49,23 +50,28 @@ private val MONTHS = mapOf(
     "jul" to 7, "ago" to 8, "sep" to 9, "sept" to 9, "set" to 9, "oct" to 10, "nov" to 11, "dic" to 12,
 )
 
-private const val DATE_SRC = """(?:\d{4}-\d{2}-\d{2}|\d{1,2}[-\s][A-Za-zÁÉÍÓÚáéíóú]{3,5}\.?[-\s]\d{4})"""
+// El mes admite "0" porque el OCR lee la O de "Oct" como cero ("04-0ct-2026").
+private const val DATE_SRC = """(?:\d{4}-\d{2}-\d{2}|\d{1,2}[-\s][A-Za-zÁÉÍÓÚáéíóú0]{3,5}\.?[-\s]\d{4})"""
 private const val MONEY_SRC = """\$\s*[\d,]+\.\d{2}"""
 private const val SIGN_SRC = """[+\-−–—]"""
 
-private val DATE_PARTS = Regex("""(\d{1,2})[-\s]([A-Za-zÁÉÍÓÚáéíóú]+)\.?[-\s](\d{4})""")
+private val DATE_PARTS = Regex("""(\d{1,2})[-\s]([A-Za-zÁÉÍÓÚáéíóú0]+)\.?[-\s](\d{4})""")
 
 private fun stripAccents(s: String) =
     Normalizer.normalize(s, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
 
-/** `2026-08-24`, `18-ago-2026`, `21-sept-2026`, `05 SEP 2026`. */
+// Confusiones típicas del OCR en el mes: "0ct" y "Qct" por "Oct". Ningún mes en español lleva q.
+private fun normalizeMonth(token: String) =
+    stripAccents(token).lowercase().replace('0', 'o').replace('q', 'o')
+
+/** `2026-08-24`, `18-ago-2026`, `21-sept-2026`, `05 SEP 2026`, `04-0ct-2026` (OCR). */
 fun parseStatementDate(text: String): LocalDate? {
     val t = text.trim()
     Regex("""^(\d{4})-(\d{2})-(\d{2})$""").matchEntire(t)?.let {
         return runCatching { LocalDate(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt()) }.getOrNull()
     }
     val m = DATE_PARTS.matchEntire(t) ?: return null
-    val month = MONTHS[stripAccents(m.groupValues[2]).lowercase()] ?: return null
+    val month = MONTHS[normalizeMonth(m.groupValues[2])] ?: return null
     return runCatching { LocalDate(m.groupValues[3].toInt(), month, m.groupValues[1].toInt()) }.getOrNull()
 }
 
@@ -76,12 +82,16 @@ private fun detectBank(text: String): String? = when {
     text.contains("Plata Card", ignoreCase = true) || text.contains("bancoplata", ignoreCase = true) -> "Plata"
     text.contains("BBVA", ignoreCase = true) -> "BBVA"
     Regex("""Tarjeta de Cr[eé]dito Nu\b""", RegexOption.IGNORE_CASE).containsMatchIn(text) -> "Nu"
+    text.contains("Santander", ignoreCase = true) -> "Santander"
     else -> null
 }
 
 // Nota al pie opcional pegada a la etiqueta ("pago1", "pago:1"). El lookahead evita que un solo
 // dígito se coma el inicio de un número mayor ("corte 21-sept": el "2" no es una nota al pie).
 private const val FOOTNOTE = """(?:\d(?![\d-]))?"""
+
+// "l" de "límite" que el OCR suele leer como I, | o 1.
+private const val L_LIKE = """[lI|1]"""
 
 private fun findDate(text: String, labelPattern: String): LocalDate? =
     Regex("(?:$labelPattern)\\W*$FOOTNOTE\\W*(?:[A-Za-zÁÉÍÓÚáéíóú]+,\\s*)?($DATE_SRC)", RegexOption.IGNORE_CASE)
@@ -92,7 +102,8 @@ private fun findMoney(text: String, labelPattern: String): Double? =
         .find(text)?.groupValues?.get(1)?.let(::money)
 
 private fun findCardLast4(text: String): String? {
-    Regex("""N[uú]mero de tarjeta:?\s*([*Xx\d\s-]*?)(\d{4})\b""", RegexOption.IGNORE_CASE)
+    // Voraz y sin cruzar renglón: con "4941 3430 0234 5716" interesan los últimos 4, no los primeros.
+    Regex("""N[uú]mero de tarjeta:?[ \t]*([*Xx\d \t-]*)(\d{4})\b""", RegexOption.IGNORE_CASE)
         .find(text)?.let { return it.groupValues[2] }
     Regex("""Tarjeta titular:?\s*\[?[Xx*#\s-]{4,}(\d{4})""", RegexOption.IGNORE_CASE)
         .find(text)?.let { return it.groupValues[1] }
@@ -108,16 +119,17 @@ private fun parseSummary(text: String): StatementSummary? {
         periodStart = period?.groupValues?.get(1)?.let(::parseStatementDate),
         periodEnd = period?.groupValues?.get(2)?.let(::parseStatementDate),
         cutoffDate = cutoff,
-        dueDate = findDate(text, """Fecha l[ií]mite de pago"""),
-        creditLimit = findMoney(text, """L[ií]mite de cr[eé]dito"""),
-        payNoInterest = findMoney(text, """^Pago para no generar\s+intereses"""),
+        dueDate = findDate(text, """Fecha $L_LIKE[ií]mite de pago"""),
+        creditLimit = findMoney(text, """$L_LIKE[ií]mite de cr[eé]dito"""),
+        // Sin ancla de línea: en un escaneo la etiqueta puede venir pegada a otra columna.
+        payNoInterest = findMoney(text, """Pago para no generar\s+intereses"""),
         // "Pago mínimo + compras y cargos diferidos..." es otra línea: se excluye con el lookahead.
         minimumPayment = findMoney(text, """^Pago m[ií]nimo(?!\s*\+)"""),
     )
 }
 
-// <fecha operación> <fecha cargo> <descripción> <+|-> $monto
-private val MOVEMENT_LINE = Regex("""^($DATE_SRC)\s+($DATE_SRC)\s+(.+?)\s+($SIGN_SRC)\s*\$\s*([\d,]+\.\d{2})\s*$""")
+// <fecha operación> <fecha cargo> <descripción> [<+|->] $monto. Algunos bancos no ponen signo en cargos.
+private val MOVEMENT_LINE = Regex("""^($DATE_SRC)\s+($DATE_SRC)\s+(.+?)\s+(?:($SIGN_SRC)\s*)?\$\s*([\d,]+\.\d{2})\s*$""")
 
 // <fecha> <descripción> $original $pendiente $requerido <n> de <m> | <n>/<m> <tasa>%
 private val INSTALLMENT_LINE = Regex(
@@ -135,13 +147,42 @@ private val INSTALLMENT_HINT = Regex("""(?i)(^\d{1,2}\s+DE\s+\d{1,2}\b|\bA\s+MES
 private val DIGITAL_CARD_SUFFIX = Regex("""\s*;\s*Tarjeta\s+(?:digital|virtual).*$""", RegexOption.IGNORE_CASE)
 private val INSTALLMENT_SUFFIX = Regex("""\s+-\s*\d{1,2}/\d{1,2}$""")
 
+// Primera mitad de una descripción partida en dos renglones: solo mayúsculas y espacios.
+private val WRAPPED_DESCRIPTION_HEAD = Regex("""^[A-ZÁÉÍÓÚÑ ]{4,40}$""")
+
+private val NEGATIVE_SIGNS = setOf("-", "−", "–", "—")
+private const val AMOUNT_EPSILON = 0.005
+private const val MIN_SHARED_WORD = 4
+
 private fun cleanDescription(raw: String): String =
     raw.replace(PLATA_TRAILING_FX, "")
         .replace(RFC_SUFFIX, "")
         .replace(DIGITAL_CARD_SUFFIX, "")
         .replace(INSTALLMENT_SUFFIX, "")
+        .replace(Regex("""^[|\s]+"""), "")
+        .replace(Regex("""^1VA\b"""), "IVA") // OCR: la I de IVA leída como 1
         .replace(Regex("""\s+"""), " ")
         .trim()
+
+private fun words(description: String): Set<String> =
+    stripAccents(description).lowercase().split(Regex("""[^a-z0-9]+"""))
+        .filter { it.length >= MIN_SHARED_WORD && !it.all(Char::isDigit) }.toSet()
+
+/**
+ * La mensualidad de una compra a meses aparece también como cargo del periodo. Si su monto
+ * coincide con el pago requerido de una fila de la tabla de MSI y comparten una palabra del
+ * comercio, ya está representada ahí y no debe contarse como gasto nuevo.
+ */
+private fun markInstallmentCharges(
+    movements: List<StatementMovement>,
+    installments: List<StatementInstallment>,
+): List<StatementMovement> = movements.map { movement ->
+    val matches = !movement.isInstallmentCharge && movement.amount > 0 && installments.any { i ->
+        abs(i.requiredPayment - movement.amount) < AMOUNT_EPSILON &&
+            words(i.description).intersect(words(movement.description)).isNotEmpty()
+    }
+    if (matches) movement.copy(isInstallmentCharge = true) else movement
+}
 
 /** Parsea el texto completo de un estado de cuenta. Devuelve null si no encuentra fecha de corte. */
 fun parseStatement(text: String): ParsedStatement? {
@@ -149,10 +190,14 @@ fun parseStatement(text: String): ParsedStatement? {
 
     val movements = mutableListOf<StatementMovement>()
     val installments = mutableListOf<StatementInstallment>()
+    var previousLine = ""
 
     for (rawLine in text.lines()) {
-        val line = rawLine.trim()
+        // El OCR deja barras verticales (bordes de tabla) pegadas al inicio o al final del renglón.
+        val line = rawLine.trim().trim('|').trim()
         if (line.isEmpty()) continue
+        val head = previousLine
+        previousLine = line
 
         INSTALLMENT_LINE.matchEntire(line)?.let { m ->
             val date = parseStatementDate(m.groupValues[1]) ?: return@let
@@ -179,6 +224,7 @@ fun parseStatement(text: String): ParsedStatement? {
             val amountAbs = money(mv.groupValues[5])
             if (operation != null && amountAbs != null) {
                 var description = mv.groupValues[3]
+                if (WRAPPED_DESCRIPTION_HEAD.matches(head)) description = "$head $description"
                 var card: String? = null
                 PLATA_LEADING_CARD.matchEntire(description)?.let {
                     card = it.groupValues[1]
@@ -186,7 +232,7 @@ fun parseStatement(text: String): ParsedStatement? {
                 }
                 EMBEDDED_CARD.find(description)?.let { card = card ?: it.groupValues[1] }
                 val cleaned = cleanDescription(description)
-                val negative = mv.groupValues[4] != "+"
+                val negative = mv.groupValues[4] in NEGATIVE_SIGNS
                 movements += StatementMovement(
                     operationDate = operation,
                     chargeDate = parseStatementDate(mv.groupValues[2]),
@@ -210,5 +256,5 @@ fun parseStatement(text: String): ParsedStatement? {
         }
     }
 
-    return ParsedStatement(summary, movements, installments)
+    return ParsedStatement(summary, markInstallmentCharges(movements, installments), installments)
 }

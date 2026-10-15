@@ -72,7 +72,7 @@ class StatementImportViewModel(
     fun onPdfRead(text: String, bytes: ByteArray?) {
         if (text.isBlank()) {
             _state.update {
-                it.copy(message = "No pude leer texto en este PDF: parece una imagen escaneada. Por ahora solo se leen estados de cuenta digitales.")
+                it.copy(message = "No pude leer texto en este PDF, ni siquiera con reconocimiento de imagen (OCR). Prueba con el PDF original del banco.")
             }
             return
         }
