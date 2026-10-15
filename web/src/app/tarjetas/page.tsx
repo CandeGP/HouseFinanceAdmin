@@ -2,6 +2,7 @@
 
 import { useFinance } from "@/components/Shell";
 import { Bar, Card, PageTitle, Tag } from "@/components/ui";
+import { cardAccent, cardLabel } from "@/lib/cards";
 import { dayLabel, mxn } from "@/lib/format";
 
 export default function Tarjetas() {
@@ -17,11 +18,11 @@ export default function Tarjetas() {
         {cards.map((card) => {
           const est = finance.estimates[card.id];
           return (
-            <Card key={card.id}>
+            <Card key={card.id} style={{ borderTop: `6px solid ${cardAccent(card)}` }}>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em]">{card.name}</h2>
-                  <p className="text-muted">{card.bank} ••{card.last4}</p>
+                  <p className="text-muted">{cardLabel(card)}</p>
                 </div>
                 <Tag>{ownerLabel(card.owner_id)}</Tag>
               </div>

@@ -9,6 +9,7 @@ export interface Card {
   name: string;
   bank: string;
   last4: string;
+  color: string | null;
   credit_limit: number;
   cutoff_day: number;
   due_day: number;
@@ -64,7 +65,7 @@ export async function loadFinance(): Promise<Finance> {
     supabase.from("members").select("user_id,display_name"),
     supabase
       .from("cards")
-      .select("id,owner_id,name,bank,last4,credit_limit,cutoff_day,due_day")
+      .select("id,owner_id,name,bank,last4,color,credit_limit,cutoff_day,due_day")
       .eq("archived", false),
     supabase.from("categories").select("id,name"),
     supabase

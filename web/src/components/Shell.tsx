@@ -14,6 +14,7 @@ interface FinanceContext {
   finance: Finance;
   uid: string;
   scope: Scope;
+  reload: () => void;
 }
 
 const Ctx = createContext<FinanceContext | null>(null);
@@ -139,7 +140,7 @@ function Workspace({ uid, children }: { uid: string; children: ReactNode }) {
             <button className={`${primaryButton} mt-4`} onClick={reload}>Reintentar</button>
           </Card>
         ) : finance ? (
-          <Ctx.Provider value={{ finance, uid, scope }}>{children}</Ctx.Provider>
+          <Ctx.Provider value={{ finance, uid, scope, reload }}>{children}</Ctx.Provider>
         ) : (
           <p className="text-muted">Cargando…</p>
         )}

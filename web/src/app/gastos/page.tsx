@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { useFinance } from "@/components/Shell";
-import { Card, PageTitle, Tag, fieldClass } from "@/components/ui";
+import { Card, CardChip, PageTitle, Tag, fieldClass } from "@/components/ui";
+import { EditTxDialog } from "@/components/EditTxDialog";
+import type { Tx } from "@/lib/data";
 import { dayLabel, monthKey, monthLabel, mxn } from "@/lib/format";
 
 type StatusFilter = "all" | "pending_review" | "confirmed";
 
 export default function Gastos() {
-  const { finance, uid, scope } = useFinance();
+  const { finance, uid, scope, reload } = useFinance();
+  const [editing, setEditing] = useState<Tx | null>(null);
   const [month, setMonth] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
@@ -25,11 +28,8 @@ export default function Gastos() {
   );
   const total = rows.reduce((sum, t) => sum + t.amount, 0);
 
-  const cardLabel = (id: string | null) => {
-    const card = finance.cards.find((c) => c.id === id);
-    return card ? `${card.name} ••${card.last4}` : "—";
-  };
-  const categoryLabel = (id: string | null) => finance.categories.find((c) => c.id === id)?.name ?? "—";
+  const cardOf = (id: string | null) => finance.cards.find((c) => c.id === id);
+  const categoryLabel = (id: string | null) => finance.categories.find((c) => c.id === id)?.name ?? "Sin categoría";
   const ownerLabel = (id: string) => finance.members.find((m) => m.user_id === id)?.display_name ?? "—";
 
   return (
@@ -51,13 +51,16 @@ export default function Gastos() {
 
       <Card className="divide-y divide-line p-0">
         {rows.map((t) => (
-          <div key={t.id} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 px-6 py-4 md:grid-cols-[90px_1fr_180px_140px_auto]">
+          <div key={t.id} onClick={() => (t.owner_id === uid ? setEditing(t) : undefined)}
+            className={`grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 px-6 py-4 md:grid-cols-[90px_1fr_220px_160px_auto] ${t.owner_id === uid ? "cursor-pointer hover:bg-canvas" : ""}`}>
             <p className="text-sm text-muted md:self-center">{dayLabel(t.occurred_at)}</p>
             <div className="min-w-0 md:self-center">
               <p className="truncate font-semibold">{t.merchant}</p>
               <p className="text-sm text-muted">{ownerLabel(t.owner_id)}</p>
             </div>
-            <p className="hidden text-sm text-muted md:block md:self-center">{cardLabel(t.card_id)}</p>
+            <div className="hidden md:block md:justify-self-start md:self-center">
+              {cardOf(t.card_id) ? <CardChip card={cardOf(t.card_id)!} /> : <span className="text-sm text-muted">Sin tarjeta</span>}
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Tag>{categoryLabel(t.category_id)}</Tag>
               {t.payment_mode === "msi" ? <Tag>MSI {t.installment_number ?? 0}/{t.installments}</Tag> : null}
@@ -68,6 +71,18 @@ export default function Gastos() {
         ))}
         {rows.length === 0 ? <p className="p-6 text-muted">Nada coincide con los filtros.</p> : null}
       </Card>
+
+      {editing ? (
+        <EditTxDialog
+          tx={editing}
+          categories={finance.categories}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            reload();
+          }}
+        />
+      ) : null}
     </>
   );
 }

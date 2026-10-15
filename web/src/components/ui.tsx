@@ -1,8 +1,31 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { cardAccent, cardLabel, type CardIdentity } from "@/lib/cards";
 
 /** Superficie base: tarjeta blanca de 12px con sombra teñida de navy, sin borde. */
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-xl bg-card p-6 shadow-card ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = "",
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div className={`rounded-xl bg-card p-6 shadow-card ${className}`} style={style}>
+      {children}
+    </div>
+  );
+}
+
+/** Tarjeta de crédito identificada por el color de su banco y "Banco ••1234". */
+export function CardChip({ card }: { card: CardIdentity }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink">
+      <span className="size-2.5 shrink-0 rounded-full" style={{ background: cardAccent(card) }} />
+      {cardLabel(card)}
+    </span>
+  );
 }
 
 /** Etiqueta en píldora: categorías, modo de pago, estado. */

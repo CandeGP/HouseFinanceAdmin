@@ -1,7 +1,8 @@
 "use client";
 
 import { useFinance } from "@/components/Shell";
-import { Bar, Card, PageTitle, Stat, Tag } from "@/components/ui";
+import { Bar, Card, CardChip, PageTitle, Stat, Tag } from "@/components/ui";
+import { cardAccent, cardLabel } from "@/lib/cards";
 import { currentMonth, dayLabel, monthKey, monthLabel, mxn } from "@/lib/format";
 
 const TOP_CATEGORIES = 5;
@@ -24,6 +25,7 @@ export default function Resumen() {
   const nextDue = [...estimates].sort((a, b) => a.est.due_date.localeCompare(b.est.due_date))[0];
 
   const categoryName = (id: string | null) => finance.categories.find((c) => c.id === id)?.name ?? "Sin categoría";
+  const cardOf = (id: string | null) => finance.cards.find((c) => c.id === id);
   const byCategory = Object.entries(
     monthTxs.reduce<Record<string, number>>((acc, t) => {
       const name = categoryName(t.category_id);
@@ -47,11 +49,16 @@ export default function Resumen() {
 
       <section className="mt-12 grid gap-6 lg:grid-cols-3">
         {nextDue ? (
-          <div className="rounded-xl bg-voltage p-6 text-on-voltage shadow-[inset_0_1px_0_rgba(255,255,255,0.53)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.04em]">Próximo pago</p>
-            <p className="mt-3 text-3xl font-semibold tracking-[-0.03em]">{dayLabel(nextDue.est.due_date)}</p>
-            <p className="mt-1 text-lg font-semibold">{nextDue.card.name} ••{nextDue.card.last4}</p>
-            <p className="mt-4 text-2xl font-semibold tracking-[-0.03em]">{mxn(nextDue.est.cycle_total)}</p>
+          <div className="relative overflow-hidden rounded-xl bg-voltage p-6 text-on-voltage shadow-card">
+            <div className="absolute -right-10 -top-10 size-40 rounded-full bg-on-voltage/5" />
+            <div className="absolute -bottom-12 right-6 size-28 rounded-full bg-on-voltage/5" />
+            <p className="relative text-[10px] font-semibold uppercase tracking-[0.04em]">Próximo pago</p>
+            <p className="relative mt-3 text-4xl font-bold tracking-[-0.05em]">{dayLabel(nextDue.est.due_date)}</p>
+            <p className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-on-voltage/10 px-3 py-1.5 text-sm font-semibold">
+              <span className="size-2.5 rounded-full" style={{ background: cardAccent(nextDue.card) }} />
+              {cardLabel(nextDue.card)}
+            </p>
+            <p className="relative mt-5 text-3xl font-semibold tracking-[-0.04em]">{mxn(nextDue.est.cycle_total)}</p>
           </div>
         ) : (
           <Card><p className="text-muted">Aún no hay tarjetas con ciclo calculado.</p></Card>
@@ -81,7 +88,11 @@ export default function Resumen() {
             <div key={t.id} className="flex items-center justify-between gap-4 px-6 py-4">
               <div className="min-w-0">
                 <p className="truncate font-semibold">{t.merchant}</p>
-                <p className="text-sm text-muted">{dayLabel(t.occurred_at)}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <span>{dayLabel(t.occurred_at)}</span>
+                  {cardOf(t.card_id) ? <CardChip card={cardOf(t.card_id)!} /> : null}
+                  <Tag>{categoryName(t.category_id)}</Tag>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 {t.status === "pending_review" ? <Tag>Por revisar</Tag> : null}
