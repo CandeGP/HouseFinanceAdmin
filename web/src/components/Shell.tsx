@@ -79,9 +79,9 @@ function Login() {
       <h1 className="text-[44px] font-bold leading-[0.95] tracking-[-0.05em] [word-spacing:0.08em]">Finanzas en pareja</h1>
       <p className="-mt-3 text-lg text-muted">Inicia sesión con tu cuenta de la app.</p>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <input className={fieldClass} type="email" placeholder="Correo" autoComplete="email" value={email}
+        <input className={fieldClass} type="email" name="email" placeholder="Correo" autoComplete="email" value={email}
           onChange={(e) => setEmail(e.target.value)} required />
-        <input className={fieldClass} type="password" placeholder="Contraseña" autoComplete="current-password"
+        <input className={fieldClass} type="password" name="password" placeholder="Contraseña" autoComplete="current-password"
           value={password} onChange={(e) => setPassword(e.target.value)} required />
         {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
         <button className={primaryButton} disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>

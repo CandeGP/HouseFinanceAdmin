@@ -3,6 +3,8 @@
 Finanzas de tarjetas de crédito para **dos personas** (MXN): qué se gastó, en qué tarjeta, cuándo es el
 corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase.
 
+**Web en producción:** https://house-finance-admin.vercel.app (Vercel, se redespliega con cada push a `main`).
+
 > Las capturas usan **datos de demostración inventados**, no cuentas reales.
 
 ## Capturas
