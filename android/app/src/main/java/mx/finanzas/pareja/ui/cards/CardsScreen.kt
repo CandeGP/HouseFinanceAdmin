@@ -86,16 +86,21 @@ fun CardsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) { Text("Importar estado de cuenta (PDF)") }
 
-            if (state.cards.isEmpty() && !state.loading) {
-                EmptyState(
-                    title = "Sin tarjetas",
-                    subtitle = "Agrega tus tarjetas de crédito con el botón +.",
-                )
-            } else {
+            // Siempre se muestra la lista: así "Archivadas" es visible aunque no quede ninguna activa.
+            run {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (state.cards.isEmpty() && !state.loading) {
+                        item {
+                            Text(
+                                "Sin tarjetas. Agrega tus tarjetas de crédito con el botón +.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     items(state.cards, key = { it.id }) { card ->
                         val mine = card.ownerId == userId
                         Card(Modifier.fillMaxWidth()) {
@@ -132,7 +137,7 @@ fun CardsScreen(
                             }
                         }
                     }
-                    if (state.archived.isNotEmpty()) {
+                    run {
                         item {
                             Text(
                                 "Archivadas (${state.archived.size})",
@@ -140,6 +145,15 @@ fun CardsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 16.dp),
                             )
+                        }
+                        if (state.archived.isEmpty()) {
+                            item {
+                                Text(
+                                    "Ninguna por ahora. Las tarjetas que archives aparecerán aquí para restaurarlas.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         items(state.archived, key = { "archived-${it.id}" }) { card ->
                             Card(Modifier.fillMaxWidth()) {
