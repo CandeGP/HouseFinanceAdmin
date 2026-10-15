@@ -14,8 +14,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.Manifest
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Switch
+import androidx.compose.ui.Alignment
+import mx.finanzas.pareja.alerts.AlertNotifier
+import mx.finanzas.pareja.alerts.AlertPrefs
+import mx.finanzas.pareja.alerts.CycleAlertScheduler
+import mx.finanzas.pareja.domain.AlertKind
+import mx.finanzas.pareja.domain.CycleAlert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +75,74 @@ private fun CaptureCard() {
                 Button(onClick = {
                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 }) { Text("Activar acceso a notificaciones") }
+            }
+        }
+    }
+}
+
+/** Activa o desactiva los avisos de corte y de pago de tus tarjetas. */
+@Composable
+private fun AlertsCard() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(AlertPrefs.isEnabled(context)) }
+    var denied by remember { mutableStateOf(false) }
+
+    fun apply(value: Boolean) {
+        AlertPrefs.setEnabled(context, value)
+        enabled = value
+        CycleAlertScheduler.sync(context)
+    }
+
+    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        denied = !granted
+        apply(granted)
+    }
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Alertas de corte y pago", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { on ->
+                        when {
+                            !on -> apply(false)
+                            AlertNotifier.canNotify(context) -> apply(true)
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                                askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            else -> denied = true
+                        }
+                    },
+                )
+            }
+            Text(
+                "Te avisa 3 días antes, un día antes y el mismo día del corte y del pago de tus tarjetas.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (denied) {
+                Text(
+                    "Activa las notificaciones de la app en los ajustes del teléfono para recibir los avisos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (enabled) {
+                OutlinedButton(onClick = {
+                    AlertNotifier.post(
+                        context,
+                        CycleAlert(
+                            key = "prueba", kind = AlertKind.DUE, cardId = "", daysLeft = 3,
+                            title = "Prueba: pago de tu tarjeta vence en 3 días",
+                            text = "Así se verá tu aviso con el monto estimado y la fecha límite.",
+                            amount = null,
+                        ),
+                    )
+                }) { Text("Enviar aviso de prueba") }
             }
         }
     }
@@ -167,6 +246,7 @@ fun AccountScreen(
             }
         }
 
+        AlertsCard()
         CaptureCard()
         UnparsedCard()
 

@@ -13,7 +13,9 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-fun prop(name: String, default: String): String = localProps.getProperty(name, default)
+// -Psupabase.url=... en la línea de comandos manda sobre local.properties (útil para builds de demo).
+fun prop(name: String, default: String): String =
+    (findProperty(name) as String?) ?: localProps.getProperty(name, default)
 
 android {
     namespace = "mx.finanzas.pareja"
@@ -21,6 +23,8 @@ android {
 
     defaultConfig {
         applicationId = "mx.finanzas.pareja"
+        // -Pdemo instala una copia aparte (otro paquete) para capturas sin tocar tu sesión real.
+        if (project.hasProperty("demo")) applicationIdSuffix = ".demo"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -73,6 +77,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.pdfbox.android)
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.androidx.work.runtime)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
