@@ -2,9 +2,12 @@ package mx.finanzas.pareja.capture
 
 import android.app.Notification
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.os.BundleCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,31 +20,48 @@ import mx.finanzas.pareja.domain.RawNotification
 import mx.finanzas.pareja.domain.parseCharge
 
 /**
- * Lee las notificaciones de las apps vigiladas (Billetera de Google y Plata) y convierte los
- * cobros en transacciones pendientes de revisión. Solo se inspeccionan los paquetes de
- * [ChargeSources.WATCHED]; cualquier otra notificación se ignora sin leerse.
+ * Lee las notificaciones de Billetera de Google y de apps de bancos/fintech (paquetes conocidos o
+ * nombre de app bancario, ver [ChargeSources.isWatched]) y convierte los cobros en transacciones
+ * pendientes de revisión. Cualquier otra app se ignora sin leerse.
  */
 class CaptureService : NotificationListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName !in ChargeSources.WATCHED) return
+        val extras = sbn.notification.extras
+        if (!ChargeSources.isWatched(sbn.packageName, appLabel(extras))) return
         if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
-        val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()
+        val app = application as FinanzasApp
 
         val charge = parseCharge(
             RawNotification(sbn.packageName, title, text, Instant.fromEpochMilliseconds(sbn.postTime)),
-        ) ?: return
+        )
+        if (charge == null) {
+            // Con monto pero sin reconocer: se guarda solo en el teléfono para afinar parsers.
+            if (text != null && text.contains('$')) {
+                app.unparsedLog.add(UnparsedNotification(sbn.packageName, title, text, sbn.postTime))
+            }
+            return
+        }
 
-        val app = application as FinanzasApp
         scope.launch {
             app.captureStore.enqueue(charge)
             CaptureSync.flush(app)
         }
+    }
+
+    /** Nombre visible de la app emisora; viene en los extras, así no hace falta visibilidad de paquetes. */
+    private fun appLabel(extras: Bundle): String? {
+        val info = BundleCompat.getParcelable(extras, EXTRA_APP_INFO, ApplicationInfo::class.java)
+        return info?.let { runCatching { packageManager.getApplicationLabel(it).toString() }.getOrNull() }
+    }
+
+    private companion object {
+        const val EXTRA_APP_INFO = "android.appInfo"
     }
 }
 

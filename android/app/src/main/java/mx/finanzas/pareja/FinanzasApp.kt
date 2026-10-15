@@ -2,6 +2,7 @@ package mx.finanzas.pareja
 
 import android.app.Application
 import mx.finanzas.pareja.capture.PendingCaptureStore
+import mx.finanzas.pareja.capture.UnparsedLogStore
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.SupabaseFinanceRepository
 import mx.finanzas.pareja.data.createSupabase
@@ -12,4 +13,6 @@ class FinanzasApp : Application() {
     }
 
     val captureStore: PendingCaptureStore by lazy { PendingCaptureStore(this) }
+
+    val unparsedLog: UnparsedLogStore by lazy { UnparsedLogStore(this) }
 }
