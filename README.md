@@ -1,9 +1,13 @@
+<p align="center"><img src="docs/logo.svg" width="96" alt="Logo: casa con un signo de pesos"></p>
+
 # HouseFinanceAdmin
 
 Finanzas de tarjetas de crédito para **dos personas** (MXN): qué se gastó, en qué tarjeta, cuándo es el
 corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase.
 
 **Web en producción:** https://house-finance-admin.vercel.app (Vercel, se redespliega con cada push a `main`).
+
+**Descargar la app (Android):** https://house-finance-admin.vercel.app/descargar
 
 > Las capturas usan **datos de demostración inventados**, no cuentas reales.
 

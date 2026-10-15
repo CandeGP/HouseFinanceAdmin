@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Casa con una moneda amarilla y el signo $. Todo dentro de la zona segura (66dp) del icono adaptativo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Casa -->
+    <path
+        android:fillColor="#F0F1F5"
+        android:pathData="M54,26 L84,52 L76,52 L76,78 Q76,80 74,80 L34,80 Q32,80 32,78 L32,52 L24,52 Z" />
+
+    <!-- Moneda -->
+    <path
+        android:fillColor="#FFE45C"
+        android:pathData="M54,49 A13,13 0 1 1 54,75 A13,13 0 1 1 54,49 Z" />
+
+    <!-- Signo $ -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,57 C59,53 49,53 49,58 C49,63 59,61 59,66 C59,71 49,71 49,67"
+        android:strokeColor="#20294C"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,51 L54,73"
+        android:strokeColor="#20294C"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+</vector>

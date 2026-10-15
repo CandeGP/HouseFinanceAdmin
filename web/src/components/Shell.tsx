@@ -27,6 +27,7 @@ export function useFinance(): FinanceContext {
 
 /** Puerta de acceso: sin configuración o sin sesión muestra su pantalla; con sesión carga los datos. */
 export function Shell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  if (pathname === "/descargar") return <>{children}</>; // página pública: no pide sesión
   if (!configured) return <Setup />;
   if (session === undefined) return null;
   if (!session) return <Login />;

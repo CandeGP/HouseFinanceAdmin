@@ -8,6 +8,8 @@
     <application
         android:name=".FinanzasApp"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="Finanzas"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

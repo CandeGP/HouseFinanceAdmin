@@ -7,3 +7,4 @@ captures/
 .cxx/
 *.keystore
 *.jks
+keystore.properties
