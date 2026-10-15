@@ -37,7 +37,7 @@ export function Bar({ pct }: { pct: number }) {
 export function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <header className="mb-8">
-      <h1 className="text-[clamp(40px,7vw,100px)] font-bold leading-[0.91] tracking-[-0.125em]">{title}</h1>
+      <h1 className="text-[clamp(40px,7vw,100px)] font-bold leading-[0.95] tracking-[-0.05em] [word-spacing:0.08em]">{title}</h1>
       {subtitle ? <p className="mt-4 max-w-xl text-lg text-muted">{subtitle}</p> : null}
     </header>
   );

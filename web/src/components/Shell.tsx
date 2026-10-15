@@ -75,7 +75,7 @@ function Login() {
 
   return (
     <Centered>
-      <h1 className="text-[44px] font-bold leading-[0.95] tracking-[-0.125em]">Finanzas en pareja</h1>
+      <h1 className="text-[44px] font-bold leading-[0.95] tracking-[-0.05em] [word-spacing:0.08em]">Finanzas en pareja</h1>
       <p className="-mt-3 text-lg text-muted">Inicia sesión con tu cuenta de la app.</p>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input className={fieldClass} type="email" placeholder="Correo" autoComplete="email" value={email}
