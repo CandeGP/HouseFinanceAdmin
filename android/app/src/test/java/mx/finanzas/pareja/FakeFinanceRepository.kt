@@ -40,6 +40,7 @@ class FakeFinanceRepository : FinanceRepository {
     val deletedTransactions = mutableListOf<String>()
     val addedCards = mutableListOf<NewCard>()
     val archivedCards = mutableListOf<String>()
+    val restoredCards = mutableListOf<String>()
     var lastRange: Pair<LocalDate, LocalDate>? = null
 
     private fun failIfNeeded() {
@@ -90,6 +91,12 @@ class FakeFinanceRepository : FinanceRepository {
 
     override suspend fun archiveCard(id: String) {
         archivedCards += id
+        cardList = cardList.map { if (it.id == id) it.copy(archived = true) else it }
+    }
+
+    override suspend fun restoreCard(id: String) {
+        restoredCards += id
+        cardList = cardList.map { if (it.id == id) it.copy(archived = false) else it }
     }
 
     override suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate? = estimates[cardId]

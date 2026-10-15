@@ -55,6 +55,7 @@ fun CardsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(openAddOnStart) }
+    var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
 
     LaunchedEffect(state.added) {
         if (state.added) {
@@ -124,8 +125,38 @@ fun CardsScreen(
                                     )
                                 }
                                 if (mine) {
-                                    IconButton(onClick = { vm.archive(card.id); onChanged() }) {
+                                    IconButton(onClick = { pendingArchive = card }) {
                                         Icon(Icons.Filled.Archive, contentDescription = "Archivar tarjeta")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (state.archived.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Archivadas (${state.archived.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 16.dp),
+                            )
+                        }
+                        items(state.archived, key = { "archived-${it.id}" }) { card ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(
+                                    Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(card.name, style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            "${card.bank} •••• ${card.last4} · conserva sus gastos",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (card.ownerId == userId) {
+                                        TextButton(onClick = { vm.restore(card.id); onChanged() }) { Text("Restaurar") }
                                     }
                                 }
                             }
@@ -134,6 +165,24 @@ fun CardsScreen(
                 }
             }
         }
+    }
+
+    pendingArchive?.let { card ->
+        AlertDialog(
+            onDismissRequest = { pendingArchive = null },
+            title = { Text("¿Archivar esta tarjeta?") },
+            text = {
+                Text(
+                    "${card.name} •••• ${card.last4}\n" +
+                        "Se oculta de Resumen, Gastos y Tarjetas, pero sus gastos y estados de cuenta " +
+                        "se conservan. La puedes restaurar en \"Archivadas\".",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.archive(card.id); onChanged(); pendingArchive = null }) { Text("Archivar") }
+            },
+            dismissButton = { TextButton(onClick = { pendingArchive = null }) { Text("Cancelar") } },
+        )
     }
 
     if (showForm) {

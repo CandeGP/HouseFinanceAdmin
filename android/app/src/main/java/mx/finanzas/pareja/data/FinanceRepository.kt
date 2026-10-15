@@ -39,6 +39,9 @@ interface FinanceRepository {
     suspend fun addCard(card: NewCard)
     suspend fun updateCard(id: String, patch: CardPatch)
     suspend fun archiveCard(id: String)
+
+    /** Deshace [archiveCard]: la tarjeta vuelve a mostrarse con todos sus gastos. */
+    suspend fun restoreCard(id: String)
     suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate?
 
     // Gastos

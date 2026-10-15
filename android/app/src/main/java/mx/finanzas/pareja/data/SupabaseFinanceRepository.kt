@@ -106,6 +106,12 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         }
     }
 
+    override suspend fun restoreCard(id: String) {
+        client.postgrest.from("cards").update(mapOf("archived" to false)) {
+            filter { eq("id", id) }
+        }
+    }
+
     override suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate? =
         client.postgrest.rpc(
             "card_cycle_estimate",

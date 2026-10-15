@@ -18,6 +18,8 @@ import mx.finanzas.pareja.domain.CardField
 
 data class CardsUiState(
     val cards: List<Card> = emptyList(),
+    /** Tarjetas archivadas: ocultas del resto de la app pero con sus gastos intactos. */
+    val archived: List<Card> = emptyList(),
     val loading: Boolean = true,
     val errors: Map<CardField, String> = emptyMap(),
     val message: String? = null,
@@ -39,8 +41,8 @@ class CardsViewModel(
     fun load() {
         viewModelScope.launch {
             try {
-                val cards = repo.cards().filterNot { it.archived }
-                _state.update { it.copy(cards = cards, loading = false) }
+                val (archived, active) = repo.cards().partition { it.archived }
+                _state.update { it.copy(cards = active, archived = archived, loading = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -76,6 +78,19 @@ class CardsViewModel(
         viewModelScope.launch {
             try {
                 repo.archiveCard(id)
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = userMessage(e)) }
+            }
+        }
+    }
+
+    fun restore(id: String) {
+        viewModelScope.launch {
+            try {
+                repo.restoreCard(id)
                 load()
             } catch (e: CancellationException) {
                 throw e

@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Descargar la app · Finanzas en pareja" };
 
 // Datos del APK publicado. Cámbialos al subir una versión nueva.
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const SIZE = "21.7 MB";
-const SHA256 = "f63ed5b2c756626f258a9167913b686d06b77be7f99caf0fc6db9f114494bf04";
+const SHA256 = "3f7a84e1e0f28b1023e60fb88f32d9059baa2820c604a662bc1d455fe016cce3";
 
 const apkUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/releases/finanzas.apk`;
 
