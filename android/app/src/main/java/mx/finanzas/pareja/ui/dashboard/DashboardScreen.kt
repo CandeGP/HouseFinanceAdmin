@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.domain.CardRank
 import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.formatMxn
+import mx.finanzas.pareja.ui.components.CardChip
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.components.ScopeToggle
@@ -53,7 +54,7 @@ fun DashboardScreen(
         if (state.pendingCount > 0) {
             Card(
                 onClick = onOpenInbox,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             ) {
                 Text(
@@ -91,7 +92,12 @@ fun DashboardScreen(
 
 @Composable
 private fun TotalsCard(totalCycle: Double, msiRemaining: Double, topCardName: String?) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        ),
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("A pagar este ciclo (estimado)", style = MaterialTheme.typography.labelLarge)
             Text(formatMxn(totalCycle), style = MaterialTheme.typography.headlineMedium)
@@ -112,11 +118,20 @@ private fun CardRankItem(rank: CardRank, ownerName: String?) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
                     Text("#${rank.rank} ${card.name}", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "${card.bank} •••• ${card.last4}" + (ownerName?.let { " · de $it" } ?: ""),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) {
+                        CardChip(card)
+                        if (ownerName != null) {
+                            Text(
+                                "de $ownerName",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
                 Text(formatMxn(est.cycleTotal), style = MaterialTheme.typography.titleMedium)
             }

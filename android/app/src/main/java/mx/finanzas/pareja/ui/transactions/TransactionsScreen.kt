@@ -3,6 +3,8 @@ package mx.finanzas.pareja.ui.transactions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import mx.finanzas.pareja.data.Card as CardModel
 import mx.finanzas.pareja.data.PaymentMode
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TxStatus
@@ -49,6 +52,8 @@ import mx.finanzas.pareja.domain.formatMonthEs
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.domain.spendingByCard
 import mx.finanzas.pareja.domain.spendingByCategory
+import mx.finanzas.pareja.ui.components.CardChip
+import mx.finanzas.pareja.ui.components.CategoryTag
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.components.ScopeToggle
@@ -70,7 +75,7 @@ fun TransactionsScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var pendingDelete by remember { mutableStateOf<Transaction?>(null) }
 
-    val cardNames = remember(state.cards) { state.cards.associate { it.id to it.name } }
+    val cardsById = remember(state.cards) { state.cards.associateBy { it.id } }
     val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
     val monthTotal = state.items.filter { it.status == TxStatus.CONFIRMED }.sumOf { it.amount }
 
@@ -124,7 +129,7 @@ fun TransactionsScreen(
                         val mine = tx.ownerId == userId
                         TransactionRow(
                             tx = tx,
-                            cardName = cardNames[tx.cardId],
+                            card = cardsById[tx.cardId],
                             categoryName = categoryNames[tx.categoryId],
                             ownerName = if (mine) null else memberNames[tx.ownerId],
                             onClick = if (mine) ({ onEdit(tx.id) }) else null,
@@ -151,10 +156,11 @@ fun TransactionsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TransactionRow(
     tx: Transaction,
-    cardName: String?,
+    card: CardModel?,
     categoryName: String?,
     ownerName: String?,
     onClick: (() -> Unit)?,
@@ -171,12 +177,17 @@ private fun TransactionRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(tx.merchant, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    listOfNotNull(
-                        formatDayMonthEs(tx.occurredAt), cardName, categoryName, ownerName?.let { "de $it" },
-                    ).joinToString(" · "),
+                    listOfNotNull(formatDayMonthEs(tx.occurredAt), ownerName?.let { "de $it" }).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (card != null) CardChip(card)
+                    CategoryTag(categoryName)
+                }
                 if (tx.paymentMode == PaymentMode.MSI) {
                     Text(
                         "MSI · mensualidad ${tx.installmentNumber ?: 1} de ${tx.installments}",

@@ -32,7 +32,7 @@ object Palette {
     val Smoke = Color(0xFF979DB5)
     val Dusk = Color(0xFF676B89)
     val Abyss = Color(0xFF042939)
-    val VoltageYellow = Color(0xFFFFFF00)
+    val VoltageYellow = Color(0xFFFFE45C) // más suave que el #FFFF00 de la referencia: se ve elegante
     val Hyacinth = Color(0xFF788DBA)
 
     // Derivados para modo oscuro (la paleta Fold es solo clara): mismos matices, más profundos.
