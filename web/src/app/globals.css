@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* Tokens Fold. El modo oscuro sigue al sistema y deriva los mismos matices, más profundos. */
+:root {
+  color-scheme: light;
+  --canvas: #f0f1f5;
+  --card: #ffffff;
+  --ink: #20294c;
+  --muted: #676b89;
+  --line: #c7cbdb;
+  --mist: #dddfe9;
+  --steel: #375390;
+  --smoke: #979db5;
+  --accent: #459af8;
+  --voltage: #ffff00;
+  --on-voltage: #042939;
+  --sh-card: 0 9px 25px rgba(32, 41, 76, 0.12);
+  --sh-nav: 0 6px 16px rgba(32, 41, 76, 0.12), 0 1px 5px rgba(32, 41, 76, 0.09);
+  --sh-btn: 0 1px 4px rgba(32, 41, 76, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --canvas: #0d1226;
+    --card: #161d38;
+    --ink: #f0f1f5;
+    --muted: #979db5;
+    --line: #2c3860;
+    --mist: #1f2849;
+    --steel: #788dba;
+    --sh-card: 0 9px 25px rgba(0, 0, 0, 0.35);
+    --sh-nav: 0 6px 16px rgba(0, 0, 0, 0.4);
+    --sh-btn: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-mist: var(--mist);
+  --color-steel: var(--steel);
+  --color-smoke: var(--smoke);
+  --color-accent: var(--accent);
+  --color-voltage: var(--voltage);
+  --color-on-voltage: var(--on-voltage);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: var(--sh-card);
+  --shadow-nav: var(--sh-nav);
+  --shadow-btn: var(--sh-btn);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
