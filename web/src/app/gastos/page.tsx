@@ -5,6 +5,7 @@ import { useFinance } from "@/components/Shell";
 import { Card, CardChip, PageTitle, Tag, fieldClass } from "@/components/ui";
 import { EditTxDialog } from "@/components/EditTxDialog";
 import type { Tx } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 import { dayLabel, monthKey, monthLabel, mxn } from "@/lib/format";
 
 type StatusFilter = "all" | "pending_review" | "confirmed";
@@ -12,6 +13,20 @@ type StatusFilter = "all" | "pending_review" | "confirmed";
 export default function Gastos() {
   const { finance, uid, scope, reload } = useFinance();
   const [editing, setEditing] = useState<Tx | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function suggestCategories() {
+    const household = finance.members.find((m) => m.user_id === uid)?.household_id;
+    if (!household) return;
+    setSuggesting(true);
+    setNotice(null);
+    const { data, error } = await supabase.rpc("apply_category_suggestions", { p_household: household });
+    setSuggesting(false);
+    if (error) return setNotice("No se pudo categorizar. Intenta de nuevo.");
+    setNotice(`${data} gasto(s) categorizados`);
+    reload();
+  }
   const [month, setMonth] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
@@ -47,6 +62,14 @@ export default function Gastos() {
           <option value="confirmed">Confirmados</option>
           <option value="pending_review">Por revisar</option>
         </select>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <button onClick={suggestCategories} disabled={suggesting}
+          className="rounded-full border border-steel px-4 py-2 text-sm font-semibold text-steel disabled:opacity-50">
+          {suggesting ? "Categorizando…" : "Categorizar los que faltan"}
+        </button>
+        {notice ? <span className="text-sm text-muted">{notice}</span> : null}
       </div>
 
       <Card className="divide-y divide-line p-0">

@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export interface Member { user_id: string; display_name: string }
+export interface Member { user_id: string; display_name: string; household_id: string }
 export interface Category { id: string; name: string }
 
 export interface Card {
@@ -62,7 +62,7 @@ export async function loadFinance(): Promise<Finance> {
   since.setMonth(since.getMonth() - MONTHS_BACK);
 
   const [members, cards, categories, txs] = await Promise.all([
-    supabase.from("members").select("user_id,display_name"),
+    supabase.from("members").select("user_id,display_name,household_id"),
     supabase
       .from("cards")
       .select("id,owner_id,name,bank,last4,color,credit_limit,cutoff_day,due_day")
