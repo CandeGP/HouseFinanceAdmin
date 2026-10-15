@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,6 +100,19 @@ private fun PendingItem(
     // Si la captura trajo tarjeta (últimos 4), llega preseleccionada.
     LaunchedEffect(tx.cardId) { if (cardId == null) cardId = tx.cardId }
 
+    var confirmDiscard by remember(tx.id) { mutableStateOf(false) }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("¿Descartar este cobro?") },
+            text = { Text("${tx.merchant} · ${formatMxn(tx.amount)}\nSe elimina y no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDiscard = false; onDiscard() }) { Text("Descartar") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Cancelar") } },
+        )
+    }
+
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -129,7 +144,7 @@ private fun PendingItem(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { onConfirm(cardId, categoryId) }) { Text("Confirmar") }
-                OutlinedButton(onClick = onDiscard) { Text("Descartar") }
+                OutlinedButton(onClick = { confirmDiscard = true }) { Text("Descartar") }
             }
         }
     }
