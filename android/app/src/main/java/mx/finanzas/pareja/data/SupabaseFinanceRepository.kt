@@ -102,6 +102,12 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         }
     }
 
+    override suspend fun editCard(id: String, patch: CardEditPatch) {
+        client.postgrest.from("cards").update(patch) {
+            filter { eq("id", id) }
+        }
+    }
+
     override suspend fun archiveCard(id: String) {
         client.postgrest.from("cards").update(mapOf("archived" to true)) {
             filter { eq("id", id) }

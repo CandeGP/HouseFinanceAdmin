@@ -6,6 +6,7 @@ import mx.finanzas.pareja.data.ManualPayment
 import mx.finanzas.pareja.data.ManualPaymentPatch
 import mx.finanzas.pareja.data.NewManualPayment
 import mx.finanzas.pareja.data.Card
+import mx.finanzas.pareja.data.CardEditPatch
 import mx.finanzas.pareja.data.CardPatch
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.CycleEstimate
@@ -42,6 +43,7 @@ class FakeFinanceRepository : FinanceRepository {
     val addedCards = mutableListOf<NewCard>()
     val archivedCards = mutableListOf<String>()
     val restoredCards = mutableListOf<String>()
+    val editedCards = mutableListOf<Pair<String, CardEditPatch>>()
     val monthSpends: MutableMap<String, MonthSpend> = mutableMapOf()
     val budgetsSet = mutableListOf<Pair<String, Double?>>()
     var lastRange: Pair<LocalDate, LocalDate>? = null
@@ -91,6 +93,18 @@ class FakeFinanceRepository : FinanceRepository {
     }
 
     override suspend fun updateCard(id: String, patch: CardPatch) = Unit
+
+    override suspend fun editCard(id: String, patch: CardEditPatch) {
+        failIfNeeded()
+        editedCards += id to patch
+        cardList = cardList.map {
+            if (it.id != id) it else it.copy(
+                name = patch.name, bank = patch.bank, last4 = patch.last4, creditLimit = patch.creditLimit,
+                cutoffDay = patch.cutoffDay, dueDay = patch.dueDay, monthlyBudget = patch.monthlyBudget,
+                color = patch.color,
+            )
+        }
+    }
 
     override suspend fun archiveCard(id: String) {
         archivedCards += id

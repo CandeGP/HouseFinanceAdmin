@@ -33,6 +33,8 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 
 - **Cuentas de pareja** con código de invitación. Cada quien edita solo lo suyo; la vista "Ambos" es de lectura.
 - **Tarjetas** con ciclo de corte/pago, límite, % de uso, color por banco y etiqueta "Banco ••1234".
+  Se editan desde la app (nombre, banco, corte, pago, límite, **presupuesto mensual** y **color**).
+- **Presupuesto mensual por tarjeta**: avisa a los dos cuando el gasto del mes lo supera.
 - **Gastos** de contado o a meses (MSI) con la mensualidad en la que van, notas y categoría.
 - **Categorías automáticas**: aprende de tu historial y, si no, usa palabras clave (Telcel → servicios,
   Caffenio → cafeterías, una taquería → comida…). 16 categorías por defecto.

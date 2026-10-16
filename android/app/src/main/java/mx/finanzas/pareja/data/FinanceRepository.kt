@@ -17,6 +17,22 @@ data class CardPatch(
 )
 
 /**
+ * Edición completa de una tarjeta propia (todos los campos se serializan, incluidos los null, así
+ * quitar el presupuesto o el color los limpia en el servidor).
+ */
+@Serializable
+data class CardEditPatch(
+    val name: String,
+    val bank: String,
+    val last4: String,
+    @SerialName("credit_limit") val creditLimit: Double,
+    @SerialName("cutoff_day") val cutoffDay: Int,
+    @SerialName("due_day") val dueDay: Int,
+    @SerialName("monthly_budget") val monthlyBudget: Double?,
+    val color: String?,
+)
+
+/**
  * Único punto de acceso a datos de la app. La implementación real habla con Supabase;
  * las pruebas usan un doble en memoria.
  */
@@ -38,6 +54,9 @@ interface FinanceRepository {
     suspend fun cards(): List<Card>
     suspend fun addCard(card: NewCard)
     suspend fun updateCard(id: String, patch: CardPatch)
+
+    /** Guarda la edición completa de una tarjeta propia (datos, presupuesto y color). */
+    suspend fun editCard(id: String, patch: CardEditPatch)
     suspend fun archiveCard(id: String)
 
     /** Deshace [archiveCard]: la tarjeta vuelve a mostrarse con todos sus gastos. */

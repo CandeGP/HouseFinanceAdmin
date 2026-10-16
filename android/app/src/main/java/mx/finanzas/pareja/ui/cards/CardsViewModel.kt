@@ -13,12 +13,15 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.Card
+import mx.finanzas.pareja.data.CardEditPatch
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardDraftResult
+import mx.finanzas.pareja.domain.CardEditDraft
+import mx.finanzas.pareja.domain.CardEditResult
 import mx.finanzas.pareja.domain.CardField
 
 data class CardsUiState(
@@ -31,6 +34,9 @@ data class CardsUiState(
     val errors: Map<CardField, String> = emptyMap(),
     val message: String? = null,
     val added: Boolean = false,
+    /** Errores del formulario de edición y señal de que se guardó (para cerrar el diálogo). */
+    val editErrors: Map<CardField, String> = emptyMap(),
+    val edited: Boolean = false,
 )
 
 class CardsViewModel(
@@ -97,6 +103,34 @@ class CardsViewModel(
             }
         }
     }
+
+    /** Valida y guarda la edición completa de una tarjeta propia (datos, presupuesto y color). */
+    fun saveEdit(id: String, draft: CardEditDraft) {
+        when (val result = draft.validate()) {
+            is CardEditResult.Invalid -> _state.update { it.copy(editErrors = result.errors, edited = false) }
+            is CardEditResult.Valid -> viewModelScope.launch {
+                val v = result.value
+                try {
+                    repo.editCard(
+                        id,
+                        CardEditPatch(
+                            name = v.card.name, bank = v.card.bank, last4 = v.card.last4,
+                            creditLimit = v.card.creditLimit, cutoffDay = v.card.cutoffDay, dueDay = v.card.dueDay,
+                            monthlyBudget = v.monthlyBudget, color = v.color,
+                        ),
+                    )
+                    _state.update { it.copy(editErrors = emptyMap(), edited = true) }
+                    load()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(message = userMessage(e)) }
+                }
+            }
+        }
+    }
+
+    fun consumeEdited() = _state.update { it.copy(edited = false, editErrors = emptyMap()) }
 
     /** `amount` null quita el presupuesto. Un monto cero o negativo se rechaza antes de llegar al servidor. */
     fun setBudget(id: String, amount: Double?) {

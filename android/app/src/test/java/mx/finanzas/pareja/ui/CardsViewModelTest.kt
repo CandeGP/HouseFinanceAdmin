@@ -3,6 +3,9 @@ package mx.finanzas.pareja.ui
 import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.FakeFinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
+import mx.finanzas.pareja.domain.CardDraft
+import mx.finanzas.pareja.domain.CardEditDraft
+import mx.finanzas.pareja.domain.CardField
 import mx.finanzas.pareja.MainDispatcherRule
 import mx.finanzas.pareja.card
 import mx.finanzas.pareja.ui.cards.CardsViewModel
@@ -36,6 +39,56 @@ class CardsViewModelTest {
         val s = vm.state.value
         assertEquals(emptyList<String>(), s.cards.map { it.id })
         assertEquals(setOf("activa", "vieja"), s.archived.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `editar guarda corte, pago, limite, presupuesto y color`() {
+        val vm = vm()
+        vm.saveEdit(
+            "activa",
+            CardEditDraft(
+                card = CardDraft(
+                    name = "Plata", bank = "Plata", last4 = "0931",
+                    limitText = "20000", cutoffText = "10", dueText = "5",
+                ),
+                budgetText = "2000",
+                color = "#7c3aed",
+            ),
+        )
+
+        val saved = vm.state.value.cards.single()
+        assertEquals(10, saved.cutoffDay)
+        assertEquals(5, saved.dueDay)
+        assertEquals(20000.0, saved.creditLimit, 0.0)
+        assertEquals(2000.0, saved.monthlyBudget!!, 0.0)
+        assertEquals("#7C3AED", saved.color)
+        assertEquals(true, vm.state.value.edited)
+    }
+
+    @Test
+    fun `una edicion invalida no llega al servidor y muestra los errores`() {
+        val vm = vm()
+        vm.saveEdit(
+            "activa",
+            CardEditDraft(CardDraft(name = "", bank = "Plata", last4 = "0931", limitText = "1", cutoffText = "99", dueText = "5")),
+        )
+
+        assertEquals(emptyList<String>(), repo.editedCards.map { it.first })
+        assertEquals(true, vm.state.value.editErrors.containsKey(CardField.NAME))
+        assertEquals(true, vm.state.value.editErrors.containsKey(CardField.CUTOFF))
+        assertEquals(false, vm.state.value.edited)
+    }
+
+    @Test
+    fun `quitar presupuesto y color en la edicion los limpia`() {
+        val vm = vm()
+        val draft = CardDraft(name = "Plata", bank = "Plata", last4 = "0931", limitText = "15000", cutoffText = "18", dueText = "19")
+        vm.saveEdit("activa", CardEditDraft(draft, budgetText = "1500", color = "#DC2626"))
+        vm.saveEdit("activa", CardEditDraft(draft, budgetText = "", color = null))
+
+        val saved = vm.state.value.cards.single()
+        assertEquals(null, saved.monthlyBudget)
+        assertEquals(null, saved.color)
     }
 
     @Test

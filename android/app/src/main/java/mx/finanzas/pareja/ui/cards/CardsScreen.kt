@@ -8,8 +8,18 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import java.util.Locale
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -41,10 +51,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.MonthSpend
+import mx.finanzas.pareja.domain.CARD_COLOR_CHOICES
 import mx.finanzas.pareja.domain.CardDraft
+import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardField
+import mx.finanzas.pareja.domain.cardAccentArgb
 import mx.finanzas.pareja.domain.formatMxn
-import mx.finanzas.pareja.domain.parseAmount
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 
@@ -61,6 +73,14 @@ fun CardsScreen(
     var showForm by remember { mutableStateOf(openAddOnStart) }
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
+
+    LaunchedEffect(state.edited) {
+        if (state.edited) {
+            budgetFor = null
+            vm.consumeEdited()
+            onChanged()
+        }
+    }
 
     LaunchedEffect(state.added) {
         if (state.added) {
@@ -115,7 +135,13 @@ fun CardsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(card.name, style = MaterialTheme.typography.titleMedium)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Box(Modifier.size(12.dp).background(Color(cardAccentArgb(card)), CircleShape))
+                                        Text(card.name, style = MaterialTheme.typography.titleMedium)
+                                    }
                                     Text(
                                         "${card.bank} •••• ${card.last4}" +
                                             (if (mine) "" else " · de ${memberNames[card.ownerId] ?: "tu pareja"}"),
@@ -189,14 +215,11 @@ fun CardsScreen(
     }
 
     budgetFor?.let { card ->
-        BudgetDialog(
+        CardEditDialog(
             card = card,
-            onDismiss = { budgetFor = null },
-            onSave = { amount ->
-                vm.setBudget(card.id, amount)
-                onChanged()
-                budgetFor = null
-            },
+            errors = state.editErrors,
+            onDismiss = { budgetFor = null; vm.consumeEdited() },
+            onSave = { draft -> vm.saveEdit(card.id, draft) },
         )
     }
 
@@ -233,7 +256,7 @@ private fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, m
     val budget = card.monthlyBudget
     when {
         budget == null && mine -> Text(
-            "Toca para fijar un presupuesto mensual",
+            "Toca la tarjeta para editarla o fijar un presupuesto mensual",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -257,50 +280,90 @@ private fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, m
     }
 }
 
+private fun plainNumber(value: Double): String = "%.2f".format(Locale.US, value)
+
+/** Editar todo lo de una tarjeta propia: datos, fechas, límite, presupuesto mensual y color. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BudgetDialog(
+private fun CardEditDialog(
     card: mx.finanzas.pareja.data.Card,
+    errors: Map<CardField, String>,
     onDismiss: () -> Unit,
-    onSave: (Double?) -> Unit,
+    onSave: (CardEditDraft) -> Unit,
 ) {
-    var text by remember { mutableStateOf(card.monthlyBudget?.let { "%.2f".format(it) }.orEmpty()) }
-    val amount = parseAmount(text)
-    val invalid = text.isNotBlank() && amount == null
+    var draft by remember(card.id) {
+        mutableStateOf(
+            CardDraft(
+                name = card.name, bank = card.bank, last4 = card.last4,
+                limitText = plainNumber(card.creditLimit),
+                cutoffText = card.cutoffDay.toString(), dueText = card.dueDay.toString(),
+            ),
+        )
+    }
+    var budgetText by remember(card.id) { mutableStateOf(card.monthlyBudget?.let(::plainNumber).orEmpty()) }
+    var color by remember(card.id) { mutableStateOf(card.color) }
+
+    @Composable
+    fun field(label: String, value: String, field: CardField, keyboard: KeyboardType = KeyboardType.Text, onChange: (String) -> Unit) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            label = { Text(label) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+            isError = errors[field] != null,
+            supportingText = errors[field]?.let { { Text(it) } },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Presupuesto mensual") },
+        title = { Text("Editar tarjeta") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                field("Nombre", draft.name, CardField.NAME) { draft = draft.copy(name = it) }
+                field("Banco", draft.bank, CardField.BANK) { draft = draft.copy(bank = it) }
+                field("Últimos 4 dígitos", draft.last4, CardField.LAST4, KeyboardType.Number) { draft = draft.copy(last4 = it.take(4)) }
+                field("Límite de crédito", draft.limitText, CardField.LIMIT, KeyboardType.Decimal) { draft = draft.copy(limitText = it) }
+                field("Día de corte (1-31)", draft.cutoffText, CardField.CUTOFF, KeyboardType.Number) { draft = draft.copy(cutoffText = it) }
+                field("Día de pago (1-31)", draft.dueText, CardField.DUE, KeyboardType.Number) { draft = draft.copy(dueText = it) }
+                field("Presupuesto mensual (opcional)", budgetText, CardField.BUDGET, KeyboardType.Decimal) { budgetText = it }
                 Text(
-                    "${card.name} •••• ${card.last4}\n" +
-                        "Te avisamos a los dos cuando el gasto del mes supere este monto. Las compras a meses " +
-                        "cuentan por su mensualidad.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "Te avisamos a los dos cuando el gasto del mes lo supere. Las compras a meses cuentan por su " +
+                        "mensualidad. Déjalo vacío para no tener presupuesto.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text("Monto en MXN (ej. 2000)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = invalid,
-                    supportingText = if (invalid) ({ Text("Escribe un monto mayor a cero") }) else null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Text("Color", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    // "Auto": el color de su banco.
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape)
+                            .border(if (color == null) 3.dp else 1.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            .clickable { color = null },
+                        contentAlignment = Alignment.Center,
+                    ) { Text("Auto", style = MaterialTheme.typography.labelSmall) }
+                    CARD_COLOR_CHOICES.forEach { hex ->
+                        val selected = color.equals(hex, ignoreCase = true)
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape)
+                                .background(Color(android.graphics.Color.parseColor(hex)))
+                                .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                .clickable { color = hex },
+                        )
+                    }
+                }
+                errors[CardField.COLOR]?.let { ErrorText(it) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(amount) }, enabled = amount != null) { Text("Guardar") }
+            TextButton(onClick = { onSave(CardEditDraft(draft, budgetText, color)) }) { Text("Guardar") }
         },
-        dismissButton = {
-            Row {
-                if (card.monthlyBudget != null) {
-                    TextButton(onClick = { onSave(null) }) { Text("Quitar") }
-                }
-                TextButton(onClick = onDismiss) { Text("Cancelar") }
-            }
-        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }
 
