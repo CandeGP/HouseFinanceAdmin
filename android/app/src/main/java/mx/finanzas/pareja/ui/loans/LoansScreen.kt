@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.loans
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,22 +19,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,11 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.toLocalDateTime
 import mx.finanzas.pareja.data.LoanDirection
 import mx.finanzas.pareja.data.LoanRepayment
 import mx.finanzas.pareja.data.PaymentMethod
@@ -66,6 +58,7 @@ import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.domain.label
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
+import mx.finanzas.pareja.ui.components.PastDateButton
 import mx.finanzas.pareja.ui.components.ScopeToggle
 import mx.finanzas.pareja.ui.payments.PayeeField
 
@@ -84,6 +77,7 @@ fun LoansScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     var showNew by remember { mutableStateOf(false) }
     var repayFor by remember { mutableStateOf<LoanView?>(null) }
+    var editRepayment by remember { mutableStateOf<Pair<LoanView, LoanRepayment>?>(null) }
     var deleteLoan by remember { mutableStateOf<LoanView?>(null) }
     var deleteRepayment by remember { mutableStateOf<Pair<LoanView, LoanRepayment>?>(null) }
 
@@ -91,6 +85,7 @@ fun LoansScreen(
         if (state.saved) {
             showNew = false
             repayFor = null
+            editRepayment = null
             vm.consumeSaved()
         }
     }
@@ -149,6 +144,7 @@ fun LoansScreen(
                             onRepay = { repayFor = it },
                             onForgive = { view -> vm.setForgiven(view.loan.id, view.state != LoanState.FORGIVEN) },
                             onDeleteLoan = { deleteLoan = it },
+                            onEditRepayment = { view, repayment -> editRepayment = view to repayment },
                             onDeleteRepayment = { view, repayment -> deleteRepayment = view to repayment },
                         )
                     }
@@ -171,10 +167,24 @@ fun LoansScreen(
     repayFor?.let { view ->
         RepaymentDialog(
             view = view,
+            editing = null,
+            today = today,
             error = state.repaymentError,
             onDismiss = { repayFor = null; vm.consumeSaved() },
             onEdit = vm::consumeSaved,
             onSave = { draft -> vm.addRepayment(view, draft) },
+        )
+    }
+
+    editRepayment?.let { (view, repayment) ->
+        RepaymentDialog(
+            view = view,
+            editing = repayment,
+            today = today,
+            error = state.repaymentError,
+            onDismiss = { editRepayment = null; vm.consumeSaved() },
+            onEdit = vm::consumeSaved,
+            onSave = { draft -> vm.updateRepayment(view, repayment, draft) },
         )
     }
 
@@ -221,6 +231,7 @@ private fun PersonCard(
     onRepay: (LoanView) -> Unit,
     onForgive: (LoanView) -> Unit,
     onDeleteLoan: (LoanView) -> Unit,
+    onEditRepayment: (LoanView, LoanRepayment) -> Unit,
     onDeleteRepayment: (LoanView, LoanRepayment) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
@@ -235,6 +246,7 @@ private fun PersonCard(
                     onRepay = if (mine) ({ onRepay(view) }) else null,
                     onForgive = if (mine) ({ onForgive(view) }) else null,
                     onDeleteLoan = if (mine) ({ onDeleteLoan(view) }) else null,
+                    onEditRepayment = if (mine) ({ repayment -> onEditRepayment(view, repayment) }) else null,
                     onDeleteRepayment = if (mine) ({ repayment -> onDeleteRepayment(view, repayment) }) else null,
                 )
             }
@@ -250,6 +262,7 @@ private fun LoanRow(
     onRepay: (() -> Unit)?,
     onForgive: (() -> Unit)?,
     onDeleteLoan: (() -> Unit)?,
+    onEditRepayment: ((LoanRepayment) -> Unit)?,
     onDeleteRepayment: ((LoanRepayment) -> Unit)?,
 ) {
     val loan = view.loan
@@ -278,9 +291,13 @@ private fun LoanRow(
             color = if (view.state == LoanState.SETTLED) MaterialTheme.colorScheme.tertiary else muted,
         )
         view.repayments.forEach { repayment ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().let { if (onEditRepayment != null) it.clickable { onEditRepayment(repayment) } else it },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    "${formatDateEs(repayment.paidOn)} · ${methodName(repayment.method)} · ${formatMxn(repayment.amount)}",
+                    "${formatDateEs(repayment.paidOn)} · ${methodName(repayment.method)} · ${formatMxn(repayment.amount)}" +
+                        if (onEditRepayment != null) " · toca para editar" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = muted,
                     modifier = Modifier.weight(1f),
@@ -325,7 +342,6 @@ private fun MethodChips(method: PaymentMethod, onChange: (PaymentMethod) -> Unit
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun NewLoanDialog(
     people: List<String>,
     errors: Map<LoanField, String>,
@@ -335,7 +351,6 @@ private fun NewLoanDialog(
     onSave: (LoanDraft) -> Unit,
 ) {
     var draft by remember { mutableStateOf(LoanDraft()) }
-    var showPicker by remember { mutableStateOf(false) }
     // Al volver a escribir se quita el error anterior.
     LaunchedEffect(draft) { if (errors.isNotEmpty()) onEdit() }
     AlertDialog(
@@ -373,10 +388,7 @@ private fun NewLoanDialog(
                     supportingText = errors[LoanField.AMOUNT]?.let { { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedButton(onClick = { showPicker = true }, modifier = Modifier.fillMaxWidth()) {
-                    val date = draft.date
-                    Text("Fecha: " + if (date == null || date == today) "hoy" else formatDateEs(date))
-                }
+                PastDateButton(draft.date, today, onChange = { draft = draft.copy(date = it) })
                 errors[LoanField.DATE]?.let { ErrorText(it) }
                 MethodChips(draft.method) { draft = draft.copy(method = it) }
                 OutlinedTextField(
@@ -391,50 +403,43 @@ private fun NewLoanDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 
-    if (showPicker) {
-        val todayMillis = today.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = (draft.date ?: today).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis // sin fechas futuras
-            },
-        )
-        DatePickerDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pickerState.selectedDateMillis?.let { millis ->
-                        draft = draft.copy(date = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date)
-                    }
-                    showPicker = false
-                }) { Text("Aceptar") }
-            },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancelar") } },
-        ) { DatePicker(state = pickerState) }
-    }
 }
 
+/** Registrar un abono nuevo, o editar uno existente ([editing]): monto, fecha, forma de pago y nota. */
 @Composable
 private fun RepaymentDialog(
     view: LoanView,
+    editing: LoanRepayment?,
+    today: LocalDate,
     error: String?,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onSave: (LoanRepaymentDraft) -> Unit,
 ) {
-    var draft by remember(view.loan.id) { mutableStateOf(LoanRepaymentDraft(amountText = plainNumber(view.remaining))) }
+    var draft by remember(view.loan.id, editing?.id) {
+        mutableStateOf(
+            if (editing == null) LoanRepaymentDraft(amountText = plainNumber(view.remaining))
+            else LoanRepaymentDraft(
+                amountText = plainNumber(editing.amount), method = editing.method,
+                note = editing.note.orEmpty(), date = editing.paidOn,
+            ),
+        )
+    }
     // Al volver a escribir se quita el error anterior.
     LaunchedEffect(draft) { if (error != null) onEdit() }
     val direction = if (view.loan.direction == LoanDirection.LENT) "te pagó" else "le pagaste"
+    // Al editar, lo que falta incluye lo que este mismo abono ya cubría.
+    val remaining = view.remaining + (editing?.amount ?: 0.0)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Abono de ${view.loan.person}") },
+        title = { Text(if (editing == null) "Abono de ${view.loan.person}" else "Editar abono de ${view.loan.person}") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Faltan ${formatMxn(view.remaining)} de ${formatMxn(view.loan.amount)}. Registra lo que $direction.",
+                    "Faltan ${formatMxn(remaining)} de ${formatMxn(view.loan.amount)}. Registra lo que $direction.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                PastDateButton(draft.date, today, onChange = { draft = draft.copy(date = it) })
                 OutlinedTextField(
                     value = draft.amountText,
                     onValueChange = { draft = draft.copy(amountText = it) },

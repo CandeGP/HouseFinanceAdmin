@@ -16,6 +16,7 @@ import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardEditPatch
 import mx.finanzas.pareja.data.CardPayment
+import mx.finanzas.pareja.data.CardPaymentPatch
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
@@ -25,6 +26,7 @@ import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardPaymentDraft
 import mx.finanzas.pareja.domain.CardPaymentResult
+import mx.finanzas.pareja.domain.paidInstant
 import mx.finanzas.pareja.domain.CardDraftResult
 import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardEditResult
@@ -50,11 +52,14 @@ data class CardsUiState(
     val paymentSaved: Boolean = false,
 )
 
+private val DEFAULT_ZONE = TimeZone.of("America/Mexico_City")
+
 class CardsViewModel(
     private val repo: FinanceRepository,
     private val userId: String,
     private val householdId: String,
     private val today: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()),
+    private val zone: TimeZone = DEFAULT_ZONE,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CardsUiState())
     val state: StateFlow<CardsUiState> = _state.asStateFlow()
@@ -154,24 +159,49 @@ class CardsViewModel(
     /** Registra un pago a una tarjeta propia para el ciclo que indica [status]. */
     fun registerPayment(card: Card, status: CardCycleStatus, draft: CardPaymentDraft) {
         if (card.ownerId != userId) return
-        when (val result = draft.validate()) {
+        when (val result = draft.validate(today)) {
             is CardPaymentResult.Invalid -> _state.update { it.copy(paymentError = result.message, paymentSaved = false) }
-            is CardPaymentResult.Valid -> viewModelScope.launch {
-                try {
-                    repo.addCardPayment(
-                        NewCardPayment(
-                            householdId = householdId, ownerId = userId, cardId = card.id,
-                            cutoffDate = status.cutoffDate, amount = result.amount,
-                            paidAt = Clock.System.now(), method = result.method, notes = result.notes,
-                        ),
-                    )
-                    _state.update { it.copy(paymentError = null, paymentSaved = true) }
-                    load()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    _state.update { it.copy(message = userMessage(e)) }
-                }
+            is CardPaymentResult.Valid -> savePayment {
+                repo.addCardPayment(
+                    NewCardPayment(
+                        householdId = householdId, ownerId = userId, cardId = card.id,
+                        cutoffDate = status.cutoffDate, amount = result.amount,
+                        paidAt = paidInstant(result.date, today, Clock.System.now(), zone),
+                        method = result.method, notes = result.notes,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Edita un pago propio (monto, fecha, forma de pago y nota). Sin cambiar el día se conserva su hora. */
+    fun updatePayment(payment: CardPayment, draft: CardPaymentDraft) {
+        if (payment.ownerId != userId) return
+        when (val result = draft.validate(today)) {
+            is CardPaymentResult.Invalid -> _state.update { it.copy(paymentError = result.message, paymentSaved = false) }
+            is CardPaymentResult.Valid -> savePayment {
+                repo.updateCardPayment(
+                    payment.id,
+                    CardPaymentPatch(
+                        amount = result.amount,
+                        paidAt = paidInstant(result.date, today, Clock.System.now(), zone, original = payment.paidAt),
+                        method = result.method, notes = result.notes,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun savePayment(write: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                write()
+                _state.update { it.copy(paymentError = null, paymentSaved = true) }
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = userMessage(e)) }
             }
         }
     }

@@ -84,6 +84,7 @@ interface FinanceRepository {
     /** Pagos registrados a la tarjeta para el ciclo que cierra en [cutoff], el más reciente primero. */
     suspend fun cardPayments(cardId: String, cutoff: LocalDate): List<CardPayment>
     suspend fun addCardPayment(payment: NewCardPayment)
+    suspend fun updateCardPayment(id: String, patch: CardPaymentPatch)
     suspend fun deleteCardPayment(id: String)
 
     // Gastos
@@ -134,6 +135,7 @@ interface FinanceRepository {
     /** Perdonar saca el préstamo de lo que se debe; reabrirlo lo devuelve. */
     suspend fun setLoanForgiven(id: String, forgiven: Boolean)
     suspend fun addLoanRepayment(repayment: NewLoanRepayment)
+    suspend fun updateLoanRepayment(id: String, patch: LoanRepaymentPatch)
     suspend fun deleteLoanRepayment(id: String)
 
     // Evidencias (bucket privado `evidence`)

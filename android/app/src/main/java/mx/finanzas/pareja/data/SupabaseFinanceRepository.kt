@@ -202,6 +202,12 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         client.postgrest.from("card_payments").insert(payment)
     }
 
+    override suspend fun updateCardPayment(id: String, patch: CardPaymentPatch) {
+        client.postgrest.from("card_payments").update(patch) {
+            filter { eq("id", id) }
+        }
+    }
+
     override suspend fun deleteCardPayment(id: String) {
         client.postgrest.from("card_payments").delete {
             filter { eq("id", id) }
@@ -373,6 +379,12 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
 
     override suspend fun addLoanRepayment(repayment: NewLoanRepayment) {
         client.postgrest.from("loan_repayments").insert(repayment)
+    }
+
+    override suspend fun updateLoanRepayment(id: String, patch: LoanRepaymentPatch) {
+        client.postgrest.from("loan_repayments").update(patch) {
+            filter { eq("id", id) }
+        }
     }
 
     override suspend fun deleteLoanRepayment(id: String) {

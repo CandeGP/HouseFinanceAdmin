@@ -318,6 +318,24 @@ data class NewLoanRepayment(
     val note: String? = null,
 )
 
+/** Edición completa de un pago a tarjeta (sin valores por defecto: la nota null se envía para poder borrarla). */
+@Serializable
+data class CardPaymentPatch(
+    val amount: Double,
+    @SerialName("paid_at") val paidAt: Instant,
+    val method: PaymentMethod,
+    val notes: String?,
+)
+
+/** Edición completa de un abono de préstamo (la nota null se envía para poder borrarla). */
+@Serializable
+data class LoanRepaymentPatch(
+    val amount: Double,
+    @SerialName("paid_on") val paidOn: LocalDate,
+    val method: PaymentMethod,
+    val note: String?,
+)
+
 @Serializable
 data class NewCardPayment(
     @SerialName("household_id") val householdId: String,

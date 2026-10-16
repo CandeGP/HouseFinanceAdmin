@@ -1,25 +1,53 @@
 package mx.finanzas.pareja.domain
 
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayStatus
 import mx.finanzas.pareja.data.PaymentMethod
 
-/** Formulario de "Registrar pago" de una tarjeta: monto, forma de pago y nota. */
+/** Formulario de "Registrar pago" de una tarjeta: monto, forma de pago, nota y fecha (null = hoy). */
 data class CardPaymentDraft(
     val amountText: String = "",
     val method: PaymentMethod = PaymentMethod.TRANSFER,
     val notes: String = "",
+    val date: LocalDate? = null,
 ) {
-    fun validate(): CardPaymentResult {
+    fun validate(today: LocalDate): CardPaymentResult {
         val amount = parseAmount(amountText) ?: return CardPaymentResult.Invalid("Monto inválido")
-        return CardPaymentResult.Valid(amount, method, notes.trim().ifEmpty { null })
+        if (date != null && date > today) return CardPaymentResult.Invalid("La fecha no puede ser futura")
+        return CardPaymentResult.Valid(amount, method, notes.trim().ifEmpty { null }, date ?: today)
     }
 }
 
 sealed interface CardPaymentResult {
-    data class Valid(val amount: Double, val method: PaymentMethod, val notes: String?) : CardPaymentResult
+    data class Valid(
+        val amount: Double,
+        val method: PaymentMethod,
+        val notes: String?,
+        val date: LocalDate,
+    ) : CardPaymentResult
+
     data class Invalid(val message: String) : CardPaymentResult
 }
+
+private const val NOON_HOUR = 12
+
+/**
+ * Instante del pago. De hoy: la hora actual. De un día anterior: mediodía de ese día (solo importa el día).
+ * Al editar, [original] se conserva si el día no cambió.
+ */
+fun paidInstant(date: LocalDate, today: LocalDate, now: Instant, zone: TimeZone, original: Instant? = null): Instant =
+    when {
+        original != null && original.toLocalDateTime(zone).date == date -> original
+        date == today -> now
+        else -> LocalDateTime(date, LocalTime(NOON_HOUR, 0)).toInstant(zone)
+    }
 
 /**
  * Línea que resume cómo va el pago del último ciclo cerrado. Siempre nombra su corte: el ciclo en

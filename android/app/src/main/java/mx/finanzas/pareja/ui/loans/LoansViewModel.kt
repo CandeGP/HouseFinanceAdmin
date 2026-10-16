@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.data.FinanceRepository
+import mx.finanzas.pareja.data.LoanRepayment
+import mx.finanzas.pareja.data.LoanRepaymentPatch
 import mx.finanzas.pareja.data.NewLoan
 import mx.finanzas.pareja.data.NewLoanRepayment
 import mx.finanzas.pareja.data.userMessage
@@ -92,13 +94,30 @@ class LoansViewModel(
 
     fun addRepayment(view: LoanView, draft: LoanRepaymentDraft) {
         if (view.loan.ownerId != userId) return
-        when (val result = draft.validate(view.remaining)) {
+        when (val result = draft.validate(view.remaining, today)) {
             is LoanRepaymentResult.Invalid -> _state.update { it.copy(repaymentError = result.message, saved = false) }
             is LoanRepaymentResult.Valid -> write {
                 repo.addLoanRepayment(
                     NewLoanRepayment(
                         householdId = householdId, ownerId = userId, loanId = view.loan.id,
-                        amount = result.amount, paidOn = today, method = result.method, note = result.note,
+                        amount = result.amount, paidOn = result.paidOn, method = result.method, note = result.note,
+                    ),
+                )
+                _state.update { it.copy(repaymentError = null, saved = true) }
+            }
+        }
+    }
+
+    /** Edita un abono propio. El tope es lo que falta del préstamo más lo que ese mismo abono ya cubría. */
+    fun updateRepayment(view: LoanView, repayment: LoanRepayment, draft: LoanRepaymentDraft) {
+        if (view.loan.ownerId != userId) return
+        when (val result = draft.validate(view.remaining + repayment.amount, today)) {
+            is LoanRepaymentResult.Invalid -> _state.update { it.copy(repaymentError = result.message, saved = false) }
+            is LoanRepaymentResult.Valid -> write {
+                repo.updateLoanRepayment(
+                    repayment.id,
+                    LoanRepaymentPatch(
+                        amount = result.amount, paidOn = result.paidOn, method = result.method, note = result.note,
                     ),
                 )
                 _state.update { it.copy(repaymentError = null, saved = true) }

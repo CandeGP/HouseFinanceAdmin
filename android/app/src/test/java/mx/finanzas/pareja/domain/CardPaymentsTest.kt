@@ -1,6 +1,8 @@
 package mx.finanzas.pareja.domain
 
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayStatus
@@ -80,17 +82,56 @@ class CardPaymentsTest {
         assertEquals(status(CardPayStatus.PAID).dueAlertKey("c1"), alert.key)
     }
 
+    private val today = LocalDate(2026, 10, 16)
+    private val zone = TimeZone.of("America/Mexico_City")
+
     @Test
     fun `registrar pago valida el monto y limpia la nota`() {
-        val ok = CardPaymentDraft(amountText = " $1,407.38 ", method = PaymentMethod.CASH, notes = "  en ventanilla ").validate()
-        assertEquals(CardPaymentResult.Valid(1407.38, PaymentMethod.CASH, "en ventanilla"), ok)
-        assertEquals(CardPaymentResult.Valid(10.0, PaymentMethod.TRANSFER, null), CardPaymentDraft("10").validate())
+        val ok = CardPaymentDraft(amountText = " $1,407.38 ", method = PaymentMethod.CASH, notes = "  en ventanilla ")
+            .validate(today)
+        assertEquals(CardPaymentResult.Valid(1407.38, PaymentMethod.CASH, "en ventanilla", today), ok)
+        assertEquals(CardPaymentResult.Valid(10.0, PaymentMethod.TRANSFER, null, today), CardPaymentDraft("10").validate(today))
     }
 
     @Test
     fun `registrar pago rechaza montos vacios, cero o negativos`() {
         listOf("", "0", "-5", "abc").forEach {
-            assertEquals(it, CardPaymentResult.Invalid("Monto inválido"), CardPaymentDraft(amountText = it).validate())
+            assertEquals(it, CardPaymentResult.Invalid("Monto inválido"), CardPaymentDraft(amountText = it).validate(today))
         }
+    }
+
+    @Test
+    fun `sin fecha el pago es de hoy y una fecha anterior se respeta`() {
+        val before = LocalDate(2026, 10, 1)
+        val ok = CardPaymentDraft(amountText = "100", date = before).validate(today) as CardPaymentResult.Valid
+        assertEquals(before, ok.date)
+    }
+
+    @Test
+    fun `una fecha futura se rechaza`() {
+        assertEquals(
+            CardPaymentResult.Invalid("La fecha no puede ser futura"),
+            CardPaymentDraft(amountText = "100", date = LocalDate(2026, 10, 17)).validate(today),
+        )
+    }
+
+    @Test
+    fun `el pago de hoy lleva la hora actual y uno anterior queda a mediodia`() {
+        val now = Instant.parse("2026-10-16T21:45:00Z")
+        assertEquals(now, paidInstant(today, today, now, zone))
+        // 10 oct 12:00 en Ciudad de México (UTC-6) = 18:00 UTC
+        assertEquals(Instant.parse("2026-10-10T18:00:00Z"), paidInstant(LocalDate(2026, 10, 10), today, now, zone))
+    }
+
+    @Test
+    fun `al editar sin cambiar el dia se conserva la hora original`() {
+        val original = Instant.parse("2026-10-10T03:30:00Z") // 9 oct 21:30 en Ciudad de México
+        val now = Instant.parse("2026-10-16T21:45:00Z")
+        assertEquals(original, paidInstant(LocalDate(2026, 10, 9), today, now, zone, original))
+        // Cambiando el día, ya no aplica la hora original.
+        assertEquals(
+            Instant.parse("2026-10-08T18:00:00Z"),
+            paidInstant(LocalDate(2026, 10, 8), today, now, zone, original),
+        )
     }
 }

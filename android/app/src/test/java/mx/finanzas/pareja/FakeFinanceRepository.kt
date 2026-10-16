@@ -10,6 +10,8 @@ import mx.finanzas.pareja.data.CardEditPatch
 import mx.finanzas.pareja.data.CardPatch
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayment
+import mx.finanzas.pareja.data.CardPaymentPatch
+import mx.finanzas.pareja.data.LoanRepaymentPatch
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.CategorySpend
 import mx.finanzas.pareja.data.CycleEstimate
@@ -192,6 +194,18 @@ class FakeFinanceRepository : FinanceRepository {
         addedCardPayments += payment
     }
 
+    val updatedCardPayments = mutableListOf<Pair<String, CardPaymentPatch>>()
+
+    override suspend fun updateCardPayment(id: String, patch: CardPaymentPatch) {
+        failIfNeeded()
+        updatedCardPayments += id to patch
+        cardPaymentList = cardPaymentList.map {
+            if (it.id == id) {
+                it.copy(amount = patch.amount, paidAt = patch.paidAt, method = patch.method, notes = patch.notes)
+            } else it
+        }.toMutableList()
+    }
+
     override suspend fun deleteCardPayment(id: String) {
         failIfNeeded()
         deletedCardPayments += id
@@ -333,6 +347,18 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun addLoanRepayment(repayment: NewLoanRepayment) {
         failIfNeeded()
         addedLoanRepayments += repayment
+    }
+
+    val updatedLoanRepayments = mutableListOf<Pair<String, LoanRepaymentPatch>>()
+
+    override suspend fun updateLoanRepayment(id: String, patch: LoanRepaymentPatch) {
+        failIfNeeded()
+        updatedLoanRepayments += id to patch
+        loanRepaymentList = loanRepaymentList.map {
+            if (it.id == id) {
+                it.copy(amount = patch.amount, paidOn = patch.paidOn, method = patch.method, note = patch.note)
+            } else it
+        }.toMutableList()
     }
 
     override suspend fun deleteLoanRepayment(id: String) {

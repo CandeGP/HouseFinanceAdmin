@@ -51,7 +51,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.MonthSpend
@@ -61,6 +64,7 @@ import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardPaymentDraft
 import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.localDate
+import mx.finanzas.pareja.ui.components.PastDateButton
 import mx.finanzas.pareja.ui.components.PayStatusText
 import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardField
@@ -86,12 +90,17 @@ fun CardsScreen(
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var payFor by remember { mutableStateOf<Pair<mx.finanzas.pareja.data.Card, CardCycleStatus>?>(null) }
+    var editPayment by remember {
+        mutableStateOf<Triple<mx.finanzas.pareja.data.Card, CardCycleStatus, CardPayment>?>(null)
+    }
     var pendingDeletePayment by remember { mutableStateOf<CardPayment?>(null) }
     val zone = remember { TimeZone.currentSystemDefault() }
+    val today = remember { Clock.System.todayIn(zone) }
 
     LaunchedEffect(state.paymentSaved) {
         if (state.paymentSaved) {
             payFor = null
+            editPayment = null
             vm.consumePaymentSaved()
             onChanged()
         }
@@ -203,11 +212,17 @@ fun CardsScreen(
                                     state.statuses[card.id]?.let { status ->
                                         PayStatusText(status, Modifier.padding(top = 6.dp))
                                         state.payments[card.id].orEmpty().forEach { payment ->
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Row(
+                                                Modifier.fillMaxWidth().let {
+                                                    if (mine) it.clickable { editPayment = Triple(card, status, payment) } else it
+                                                },
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
                                                 Text(
                                                     "${formatDateEs(localDate(payment.paidAt, zone))} · " +
                                                         "${if (payment.method == PaymentMethod.CASH) "Efectivo" else "Transferencia"}" +
-                                                        " · ${formatMxn(payment.amount)}",
+                                                        " · ${formatMxn(payment.amount)}" +
+                                                        if (mine) " · toca para editar" else "",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.weight(1f),
@@ -288,9 +303,27 @@ fun CardsScreen(
         CardPaymentDialog(
             card = card,
             status = status,
+            editing = null,
+            today = today,
+            zone = zone,
             error = state.paymentError,
             onDismiss = { payFor = null; vm.consumePaymentSaved() },
+            onEdit = vm::consumePaymentSaved,
             onSave = { draft -> vm.registerPayment(card, status, draft) },
+        )
+    }
+
+    editPayment?.let { (card, status, payment) ->
+        CardPaymentDialog(
+            card = card,
+            status = status,
+            editing = payment,
+            today = today,
+            zone = zone,
+            error = state.paymentError,
+            onDismiss = { editPayment = null; vm.consumePaymentSaved() },
+            onEdit = vm::consumePaymentSaved,
+            onSave = { draft -> vm.updatePayment(payment, draft) },
         )
     }
 
@@ -372,21 +405,39 @@ private fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, m
 
 private fun plainNumber(value: Double): String = "%.2f".format(Locale.US, value)
 
-/** Registrar un pago a la tarjeta: monto (lo que falta, editable), forma de pago y nota. */
+/**
+ * Registrar un pago a la tarjeta (monto con lo que falta, fecha, forma de pago y nota) o editar uno
+ * existente ([editing]).
+ */
 @Composable
 private fun CardPaymentDialog(
     card: mx.finanzas.pareja.data.Card,
     status: CardCycleStatus,
+    editing: CardPayment?,
+    today: LocalDate,
+    zone: TimeZone,
     error: String?,
     onDismiss: () -> Unit,
+    onEdit: () -> Unit,
     onSave: (CardPaymentDraft) -> Unit,
 ) {
-    var draft by remember(card.id, status.cutoffDate) {
-        mutableStateOf(CardPaymentDraft(amountText = if (status.remaining > 0) plainNumber(status.remaining) else ""))
+    var draft by remember(card.id, status.cutoffDate, editing?.id) {
+        mutableStateOf(
+            if (editing == null) {
+                CardPaymentDraft(amountText = if (status.remaining > 0) plainNumber(status.remaining) else "")
+            } else {
+                CardPaymentDraft(
+                    amountText = plainNumber(editing.amount), method = editing.method,
+                    notes = editing.notes.orEmpty(), date = localDate(editing.paidAt, zone),
+                )
+            },
+        )
     }
+    // Al volver a escribir se quita el error anterior.
+    LaunchedEffect(draft) { if (error != null) onEdit() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Pago a ${card.name}") },
+        title = { Text(if (editing == null) "Pago a ${card.name}" else "Editar pago a ${card.name}") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -395,6 +446,7 @@ private fun CardPaymentDialog(
                         if (status.targetSource == "statement") " (según tu estado de cuenta)" else " (estimado de la app)",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                PastDateButton(draft.date, today, onChange = { draft = draft.copy(date = it) })
                 OutlinedTextField(
                     value = draft.amountText,
                     onValueChange = { draft = draft.copy(amountText = it) },

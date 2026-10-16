@@ -157,12 +157,27 @@ class LoansTest {
         val draft = LoanRepaymentDraft(amountText = "250")
         assertEquals(
             LoanRepaymentResult.Invalid("Es más de lo que falta (${formatMxn(200.0)})"),
-            draft.validate(remaining = 200.0),
+            draft.validate(remaining = 200.0, today = today),
         )
         assertEquals(
-            LoanRepaymentResult.Valid(200.0, PaymentMethod.TRANSFER, null),
-            LoanRepaymentDraft(amountText = "200").validate(remaining = 200.0),
+            LoanRepaymentResult.Valid(200.0, PaymentMethod.TRANSFER, null, today),
+            LoanRepaymentDraft(amountText = "200").validate(remaining = 200.0, today = today),
         )
-        assertEquals(LoanRepaymentResult.Invalid("Monto inválido"), LoanRepaymentDraft("0").validate(200.0))
+        assertEquals(
+            LoanRepaymentResult.Invalid("Monto inválido"),
+            LoanRepaymentDraft("0").validate(200.0, today),
+        )
+    }
+
+    @Test
+    fun `un abono de dias atras conserva su fecha y uno futuro se rechaza`() {
+        val before = LocalDate(2026, 10, 12)
+        val ok = LoanRepaymentDraft(amountText = "50", date = before).validate(200.0, today) as LoanRepaymentResult.Valid
+        assertEquals(before, ok.paidOn)
+
+        assertEquals(
+            LoanRepaymentResult.Invalid("La fecha no puede ser futura"),
+            LoanRepaymentDraft(amountText = "50", date = LocalDate(2026, 10, 17)).validate(200.0, today),
+        )
     }
 }

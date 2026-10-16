@@ -185,6 +185,83 @@ class CardsViewModelTest {
         assertEquals(emptyList<Any>(), repo.addedCardPayments)
     }
 
+    private val oct16 = LocalDate(2026, 10, 16)
+    private fun vmOn(today: LocalDate) = CardsViewModel(repo, userId = "u1", householdId = "h1", today = today)
+
+    @Test
+    fun `registrar un pago de dias atras lo guarda con esa fecha`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PENDING)
+        val vm = vmOn(oct16)
+        vm.registerPayment(
+            vm.state.value.cards.single(), vm.state.value.statuses["activa"]!!,
+            CardPaymentDraft(amountText = "100", date = LocalDate(2026, 10, 10)),
+        )
+
+        // 10 oct a mediodía en Ciudad de México (UTC-6) = 18:00 UTC
+        assertEquals(Instant.parse("2026-10-10T18:00:00Z"), repo.addedCardPayments.single().paidAt)
+    }
+
+    @Test
+    fun `una fecha futura no llega al servidor al registrar un pago`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PENDING)
+        val vm = vmOn(oct16)
+        vm.registerPayment(
+            vm.state.value.cards.single(), vm.state.value.statuses["activa"]!!,
+            CardPaymentDraft(amountText = "100", date = LocalDate(2026, 10, 20)),
+        )
+
+        assertEquals(emptyList<Any>(), repo.addedCardPayments)
+        assertEquals("La fecha no puede ser futura", vm.state.value.paymentError)
+    }
+
+    @Test
+    fun `editar un pago cambia monto, fecha, forma de pago y nota`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PARTIAL, paid = 300.0)
+        repo.cardPaymentList += payment("p1")
+        val vm = vmOn(oct16)
+        vm.updatePayment(
+            vm.state.value.payments["activa"]!!.single(),
+            CardPaymentDraft(amountText = "450", method = PaymentMethod.TRANSFER, notes = " ajuste ", date = LocalDate(2026, 10, 11)),
+        )
+
+        val (id, patch) = repo.updatedCardPayments.single()
+        assertEquals("p1", id)
+        assertEquals(450.0, patch.amount, 0.0)
+        assertEquals(PaymentMethod.TRANSFER, patch.method)
+        assertEquals("ajuste", patch.notes)
+        assertEquals(Instant.parse("2026-10-11T18:00:00Z"), patch.paidAt)
+        assertEquals(true, vm.state.value.paymentSaved)
+        assertEquals(450.0, vm.state.value.payments["activa"]!!.single().amount, 0.0)
+    }
+
+    @Test
+    fun `editar sin cambiar el dia conserva la hora original del pago`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PARTIAL, paid = 300.0)
+        repo.cardPaymentList += payment("p1") // 12 oct 18:00 UTC = 12 oct 12:00 en Ciudad de México
+        val vm = vmOn(oct16)
+        vm.updatePayment(
+            vm.state.value.payments["activa"]!!.single(),
+            CardPaymentDraft(amountText = "320", date = LocalDate(2026, 10, 12)),
+        )
+
+        assertEquals(Instant.parse("2026-10-12T18:00:00Z"), repo.updatedCardPayments.single().second.paidAt)
+    }
+
+    @Test
+    fun `no se edita un pago ajeno ni con datos invalidos`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PARTIAL, paid = 300.0)
+        repo.cardPaymentList += payment("p1")
+        val vm = vmOn(oct16)
+        val own = vm.state.value.payments["activa"]!!.single()
+
+        vm.updatePayment(own.copy(ownerId = "u2"), CardPaymentDraft("100"))
+        assertEquals(emptyList<Any>(), repo.updatedCardPayments)
+
+        vm.updatePayment(own, CardPaymentDraft("0"))
+        assertEquals(emptyList<Any>(), repo.updatedCardPayments)
+        assertEquals("Monto inválido", vm.state.value.paymentError)
+    }
+
     @Test
     fun `borrar un pago lo quita y recarga`() {
         repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PARTIAL, paid = 300.0)

@@ -117,6 +117,65 @@ class LoansViewModelTest {
     }
 
     @Test
+    fun `un abono de dias atras se guarda con su fecha y uno futuro no`() {
+        val vm = vm()
+        val view = vm.state.value.balances.first { it.person == "Hermana" }.loans.single()
+
+        vm.addRepayment(view, LoanRepaymentDraft(amountText = "50", date = LocalDate(2026, 10, 11)))
+        assertEquals(LocalDate(2026, 10, 11), repo.addedLoanRepayments.single().paidOn)
+
+        vm.addRepayment(view, LoanRepaymentDraft(amountText = "10", date = LocalDate(2026, 10, 20)))
+        assertEquals(1, repo.addedLoanRepayments.size)
+        assertEquals("La fecha no puede ser futura", vm.state.value.repaymentError)
+    }
+
+    @Test
+    fun `editar un abono cambia monto, fecha, forma de pago y nota`() {
+        val vm = vm()
+        val view = vm.state.value.balances.first { it.person == "Hermana" }.loans.single()
+        vm.updateRepayment(
+            view, view.repayments.single(),
+            LoanRepaymentDraft(amountText = "120", method = PaymentMethod.TRANSFER, note = " corregido ", date = LocalDate(2026, 10, 13)),
+        )
+
+        val (id, patch) = repo.updatedLoanRepayments.single()
+        assertEquals("r1", id)
+        assertEquals(120.0, patch.amount, 0.0)
+        assertEquals(LocalDate(2026, 10, 13), patch.paidOn)
+        assertEquals(PaymentMethod.TRANSFER, patch.method)
+        assertEquals("corregido", patch.note)
+        assertTrue(vm.state.value.saved)
+        assertEquals(180.0, vm.state.value.balances.first { it.person == "Hermana" }.net, 0.0) // 300 - 120
+    }
+
+    @Test
+    fun `al editar un abono se puede subir hasta cubrir todo el prestamo pero no mas`() {
+        val vm = vm()
+        val view = vm.state.value.balances.first { it.person == "Hermana" }.loans.single() // 300, abonado 100
+
+        vm.updateRepayment(view, view.repayments.single(), LoanRepaymentDraft(amountText = "300"))
+        assertEquals(300.0, repo.updatedLoanRepayments.single().second.amount, 0.0)
+
+        val after = vm.state.value.balances.first { it.person == "Hermana" }.loans.single()
+        vm.updateRepayment(after, after.repayments.single(), LoanRepaymentDraft(amountText = "301"))
+        assertEquals(1, repo.updatedLoanRepayments.size)
+        assertTrue(vm.state.value.repaymentError!!.startsWith("Es más de lo que falta"))
+    }
+
+    @Test
+    fun `no se edita un abono de un prestamo ajeno`() {
+        repo.loanRepaymentList += LoanRepayment(
+            id = "r2", householdId = "h1", ownerId = "u2", loanId = "l2", amount = 20.0,
+            paidOn = LocalDate(2026, 10, 14), method = PaymentMethod.CASH,
+        )
+        val vm = vm()
+        val view = vm.state.value.balances.first { it.person == "Mamá" }.loans.single()
+        vm.updateRepayment(view, view.repayments.single(), LoanRepaymentDraft(amountText = "30"))
+
+        assertTrue(repo.updatedLoanRepayments.isEmpty())
+    }
+
+    @Test
     fun `un abono mayor a lo que falta se rechaza sin llamar al servidor`() {
         val vm = vm()
         val view = vm.state.value.balances.first { it.person == "Hermana" }.loans.single()

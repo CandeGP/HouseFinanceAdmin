@@ -106,23 +106,34 @@ sealed interface LoanResult {
     data class Invalid(val errors: Map<LoanField, String>) : LoanResult
 }
 
-/** Formulario de "Abonar" a un préstamo. */
+/** Formulario de "Abonar" a un préstamo. [date] null significa hoy; no puede ser futura. */
 data class LoanRepaymentDraft(
     val amountText: String = "",
     val method: PaymentMethod = PaymentMethod.TRANSFER,
     val note: String = "",
+    val date: LocalDate? = null,
 ) {
-    /** [remaining] es lo que falta del préstamo: un abono no puede pasarse de ahí. */
-    fun validate(remaining: Double): LoanRepaymentResult {
+    /**
+     * [remaining] es lo que falta del préstamo: un abono no puede pasarse de ahí. Al editar un abono,
+     * [remaining] debe incluir lo que ese mismo abono ya cubría.
+     */
+    fun validate(remaining: Double, today: LocalDate): LoanRepaymentResult {
         val amount = parseAmount(amountText) ?: return LoanRepaymentResult.Invalid("Monto inválido")
         if (cents(amount) > cents(remaining)) {
             return LoanRepaymentResult.Invalid("Es más de lo que falta (${formatMxn(remaining)})")
         }
-        return LoanRepaymentResult.Valid(amount, method, note.trim().ifEmpty { null })
+        if (date != null && date > today) return LoanRepaymentResult.Invalid("La fecha no puede ser futura")
+        return LoanRepaymentResult.Valid(amount, method, note.trim().ifEmpty { null }, date ?: today)
     }
 }
 
 sealed interface LoanRepaymentResult {
-    data class Valid(val amount: Double, val method: PaymentMethod, val note: String?) : LoanRepaymentResult
+    data class Valid(
+        val amount: Double,
+        val method: PaymentMethod,
+        val note: String?,
+        val paidOn: LocalDate,
+    ) : LoanRepaymentResult
+
     data class Invalid(val message: String) : LoanRepaymentResult
 }
