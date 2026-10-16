@@ -162,7 +162,7 @@ class CardsViewModel(
                         NewCardPayment(
                             householdId = householdId, ownerId = userId, cardId = card.id,
                             cutoffDate = status.cutoffDate, amount = result.amount,
-                            method = result.method, notes = result.notes,
+                            paidAt = Clock.System.now(), method = result.method, notes = result.notes,
                         ),
                     )
                     _state.update { it.copy(paymentError = null, paymentSaved = true) }

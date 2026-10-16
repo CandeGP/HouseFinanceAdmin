@@ -10,19 +10,29 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.ImportInstallment
 import mx.finanzas.pareja.data.ImportMovement
 import mx.finanzas.pareja.data.ImportResult
+import mx.finanzas.pareja.data.NewCardPayment
+import mx.finanzas.pareja.data.PaymentMethod
 import mx.finanzas.pareja.data.StatementImportSummary
 import mx.finanzas.pareja.data.userMessage
+import mx.finanzas.pareja.domain.DetectedPayment
 import mx.finanzas.pareja.domain.ParsedStatement
 import mx.finanzas.pareja.domain.Reconciliation
+import mx.finanzas.pareja.domain.StatementSummary
+import mx.finanzas.pareja.domain.detectCardPayments
 import mx.finanzas.pareja.domain.evidencePath
 import mx.finanzas.pareja.domain.parseStatement
+import mx.finanzas.pareja.domain.previousCutoff
 import mx.finanzas.pareja.domain.reconcile
 
 enum class ImportStep { PICK, REVIEW, DONE }
@@ -38,8 +48,15 @@ data class StatementImportUiState(
     val busy: Boolean = false,
     val message: String? = null,
     val result: ImportResult? = null,
+    /** Pagos a la tarjeta que trae el estado (se registran contra el corte anterior). */
+    val payments: List<DetectedPayment> = emptyList(),
+    /** Posiciones de [payments] que la persona desmarcó. */
+    val excludedPayments: Set<Int> = emptySet(),
+    val paymentsRegistered: Int = 0,
 )
 
+private const val PAYMENT_HOUR = 12 // el estado trae solo la fecha: se guarda a mediodía para no cruzar de día
+private val DEFAULT_ZONE = TimeZone.of("America/Mexico_City")
 private const val WINDOW_DAYS = 7
 private const val FALLBACK_PERIOD_DAYS = 31
 
@@ -49,6 +66,7 @@ class StatementImportViewModel(
     private val userId: String,
     private val householdId: String,
     private val newFileId: () -> String,
+    private val zone: TimeZone = DEFAULT_ZONE,
 ) : ViewModel() {
     private val _state = MutableStateFlow(StatementImportUiState())
     val state: StateFlow<StatementImportUiState> = _state.asStateFlow()
@@ -91,6 +109,7 @@ class StatementImportViewModel(
             it.copy(
                 step = ImportStep.REVIEW, parsed = parsed, cardId = guess?.id,
                 reconciliation = null, excluded = emptySet(), message = null, result = null,
+                payments = emptyList(), excludedPayments = emptySet(), paymentsRegistered = 0,
             )
         }
         guess?.let { recompute(it.id) }
@@ -104,6 +123,15 @@ class StatementImportViewModel(
     fun toggleMovement(index: Int) {
         _state.update {
             it.copy(excluded = if (index in it.excluded) it.excluded - index else it.excluded + index)
+        }
+    }
+
+    fun togglePayment(index: Int) {
+        _state.update {
+            it.copy(
+                excludedPayments =
+                    if (index in it.excludedPayments) it.excludedPayments - index else it.excludedPayments + index,
+            )
         }
     }
 
@@ -129,13 +157,51 @@ class StatementImportViewModel(
                     end.plus(WINDOW_DAYS, DateTimeUnit.DAY),
                 )
                 val result = reconcile(parsed, txs, cardId)
-                _state.update { it.copy(reconciliation = result) }
+                // Los pagos del estado liquidan el corte anterior: se compara con lo ya capturado de ese ciclo.
+                val existing = repo.cardPayments(cardId, previousCutoff(parsed.summary))
+                _state.update {
+                    it.copy(
+                        reconciliation = result,
+                        payments = detectCardPayments(result.payments, existing),
+                        excludedPayments = emptySet(),
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(message = userMessage(e)) }
             }
         }
+    }
+
+    /**
+     * Registra los pagos elegidos. Nunca lanza: el estado de cuenta ya quedó importado y su PDF ligado,
+     * así que un fallo aquí solo se avisa (los pagos se pueden capturar a mano en Tarjetas).
+     */
+    private suspend fun registerPayments(cardId: String, summary: StatementSummary, chosen: List<DetectedPayment>): Int {
+        var registered = 0
+        try {
+            val cutoff = previousCutoff(summary)
+            for (payment in chosen) {
+                repo.addCardPayment(
+                    NewCardPayment(
+                        householdId = householdId, ownerId = userId, cardId = cardId, cutoffDate = cutoff,
+                        amount = payment.amount,
+                        paidAt = LocalDateTime(payment.movement.operationDate, LocalTime(PAYMENT_HOUR, 0)).toInstant(zone),
+                        method = PaymentMethod.TRANSFER,
+                        notes = "Del estado de cuenta: ${payment.movement.description}",
+                    ),
+                )
+                registered++
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _state.update {
+                it.copy(message = "El estado se importó, pero no pude registrar los pagos: ${userMessage(e)}")
+            }
+        }
+        return registered
     }
 
     fun import() {
@@ -178,7 +244,13 @@ class StatementImportViewModel(
                         ImportInstallment(it.purchaseDate, it.description, it.originalAmount, it.current, it.total)
                     },
                 )
-                _state.update { it.copy(busy = false, step = ImportStep.DONE, result = result) }
+                val chosen = current.payments.filterIndexed { index, payment ->
+                    !payment.alreadyRegistered && index !in current.excludedPayments
+                }
+                val registered = registerPayments(cardId, s, chosen)
+                _state.update {
+                    it.copy(busy = false, step = ImportStep.DONE, result = result, paymentsRegistered = registered)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

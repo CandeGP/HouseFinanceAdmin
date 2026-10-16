@@ -178,7 +178,7 @@ fun MainScaffold(
             composable(ROUTE_STATEMENT_IMPORT) {
                 val vm: StatementImportViewModel = viewModel(
                     factory = viewModelFactory {
-                        StatementImportViewModel(repo, userId, householdId) { UUID.randomUUID().toString() }
+                        StatementImportViewModel(repo, userId, householdId, newFileId = { UUID.randomUUID().toString() })
                     },
                 )
                 StatementImportScreen(

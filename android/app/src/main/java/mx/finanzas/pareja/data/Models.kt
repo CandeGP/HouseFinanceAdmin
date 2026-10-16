@@ -313,6 +313,7 @@ data class NewCardPayment(
     @SerialName("card_id") val cardId: String,
     @SerialName("cutoff_date") val cutoffDate: LocalDate,
     val amount: Double,
+    @SerialName("paid_at") val paidAt: Instant,
     val method: PaymentMethod,
     val notes: String? = null,
 )

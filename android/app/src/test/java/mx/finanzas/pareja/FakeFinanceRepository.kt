@@ -157,8 +157,12 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun cardPayments(cardId: String, cutoff: LocalDate): List<CardPayment> =
         cardPaymentList.filter { it.cardId == cardId && it.cutoffDate == cutoff }
 
+    /** Falla solo el registro de pagos a tarjeta (el resto del repositorio sigue funcionando). */
+    var cardPaymentFailWith: Exception? = null
+
     override suspend fun addCardPayment(payment: NewCardPayment) {
         failIfNeeded()
+        cardPaymentFailWith?.let { throw it }
         addedCardPayments += payment
     }
 

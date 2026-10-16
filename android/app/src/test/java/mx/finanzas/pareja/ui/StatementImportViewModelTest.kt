@@ -1,9 +1,12 @@
 package mx.finanzas.pareja.ui
 
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.FakeFinanceRepository
 import mx.finanzas.pareja.MainDispatcherRule
 import mx.finanzas.pareja.card
+import mx.finanzas.pareja.data.CardPayment
+import mx.finanzas.pareja.data.PaymentMethod
 import mx.finanzas.pareja.tx
 import mx.finanzas.pareja.ui.statements.ImportStep
 import mx.finanzas.pareja.ui.statements.StatementImportViewModel
@@ -121,6 +124,80 @@ class StatementImportViewModelTest {
         vm.toggleMovement(0)
         vm.import()
         assertTrue(repo.importCalls.single().movements.isEmpty())
+    }
+
+    // Mismo estado, con un pago por SPEI y una bonificación (esta no es un pago).
+    private val textWithPayments = text + "\n" +
+        "17-sep-2026 17-sep-2026 0931 Pago por transferencia SPEI − 5,560.26 MXN 1.00 − ${dollar}5,560.26\n" +
+        "05-sep-2026 12-sep-2026 0931 Abono de \"Amazon A Meses\" -${dollar}400.58"
+
+    private fun existingPayment(amount: Double) = CardPayment(
+        id = "p-old", householdId = "h1", ownerId = "u1", cardId = "c1", cutoffDate = LocalDate(2026, 8, 18),
+        amount = amount, paidAt = Instant.parse("2026-09-17T18:00:00Z"), method = PaymentMethod.CASH,
+    )
+
+    @Test
+    fun `detecta los pagos del estado y deja fuera las bonificaciones`() {
+        val vm = vm()
+        vm.onPdfRead(textWithPayments, null)
+
+        val payments = vm.state.value.payments
+        assertEquals(1, payments.size)
+        assertEquals(5560.26, payments.single().amount, 0.0)
+        assertEquals(false, payments.single().alreadyRegistered)
+    }
+
+    @Test
+    fun `importar registra los pagos como pago del corte anterior con la fecha del abono`() {
+        val vm = vm()
+        vm.onPdfRead(textWithPayments, null)
+        vm.import()
+
+        val added = repo.addedCardPayments.single()
+        assertEquals("c1", added.cardId)
+        assertEquals("u1", added.ownerId)
+        assertEquals(LocalDate(2026, 8, 18), added.cutoffDate) // el estado es del corte 18 sep; paga el del 18 ago
+        assertEquals(5560.26, added.amount, 0.0)
+        assertEquals(Instant.parse("2026-09-17T18:00:00Z"), added.paidAt)
+        assertEquals(PaymentMethod.TRANSFER, added.method)
+        assertEquals(1, vm.state.value.paymentsRegistered)
+        assertEquals(ImportStep.DONE, vm.state.value.step)
+    }
+
+    @Test
+    fun `un pago desmarcado no se registra`() {
+        val vm = vm()
+        vm.onPdfRead(textWithPayments, null)
+        vm.togglePayment(0)
+        vm.import()
+
+        assertTrue(repo.addedCardPayments.isEmpty())
+        assertEquals(0, vm.state.value.paymentsRegistered)
+    }
+
+    @Test
+    fun `un pago ya capturado a mano no se duplica`() {
+        repo.cardPaymentList += existingPayment(5560.26)
+        val vm = vm()
+        vm.onPdfRead(textWithPayments, null)
+
+        assertEquals(true, vm.state.value.payments.single().alreadyRegistered)
+        vm.import()
+        assertTrue(repo.addedCardPayments.isEmpty())
+    }
+
+    @Test
+    fun `si falla el registro de pagos el estado igual queda importado y se avisa`() {
+        repo.cardPaymentFailWith = Exception("Sin conexión con el servidor")
+        val vm = vm()
+        vm.onPdfRead(textWithPayments, ByteArray(10))
+        vm.import()
+
+        assertEquals(1, repo.importCalls.size)
+        assertTrue(repo.deletedEvidence.isEmpty()) // el PDF ya quedó ligado al estado: no se borra
+        assertEquals(ImportStep.DONE, vm.state.value.step)
+        assertEquals(0, vm.state.value.paymentsRegistered)
+        assertNotNull(vm.state.value.message)
     }
 
     @Test

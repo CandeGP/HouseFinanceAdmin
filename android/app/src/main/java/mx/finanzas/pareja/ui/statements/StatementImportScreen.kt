@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import mx.finanzas.pareja.domain.StatementSummary
 import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.formatMxn
+import mx.finanzas.pareja.domain.previousCutoff
 import mx.finanzas.pareja.ui.components.DropdownField
 import mx.finanzas.pareja.ui.components.ErrorText
 
@@ -105,6 +106,9 @@ fun StatementImportScreen(
                     val r = state.result
                     Text("Listo", style = MaterialTheme.typography.titleLarge)
                     Text("Se importaron ${r?.movements ?: 0} movimiento(s) y ${r?.installments ?: 0} compra(s) a meses.")
+                    if (state.paymentsRegistered > 0) {
+                        Text("Se registraron ${state.paymentsRegistered} pago(s) a la tarjeta.")
+                    }
                     Text(
                         "La tarjeta quedó con el corte, pago y límite de tu estado de cuenta.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -203,6 +207,35 @@ private fun ReviewContent(
             "Pagos y abonos",
             "${rec.payments.size} por ${formatMxn(-rec.payments.sumOf { it.amount })} (no se importan como gasto).",
         )
+    }
+
+    if (state.payments.isNotEmpty()) {
+        Text("Pagos a la tarjeta detectados (${state.payments.size})", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Se registran como pago del corte del ${formatDateEs(previousCutoff(parsed.summary))}, " +
+                "que es el saldo que liquidan.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        state.payments.forEachIndexed { index, payment ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = !payment.alreadyRegistered && index !in state.excludedPayments,
+                    enabled = !payment.alreadyRegistered,
+                    onCheckedChange = { vm.togglePayment(index) },
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(payment.movement.description, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        formatDateEs(payment.movement.operationDate) +
+                            if (payment.alreadyRegistered) " · ya lo tenías registrado" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(formatMxn(payment.amount), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 
     Text(
