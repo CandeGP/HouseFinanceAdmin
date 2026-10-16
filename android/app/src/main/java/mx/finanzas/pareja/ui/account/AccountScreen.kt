@@ -149,8 +149,9 @@ private fun AlertsCard() {
                 )
             }
             Text(
-                "Corte y pago de tus tarjetas: 3 días antes, un día antes y el mismo día. También avisa cuando " +
-                    "el gasto del mes supera el presupuesto de una tarjeta (se fija tocando la tarjeta).",
+                "Corte y pago de tus tarjetas: 3 días antes, un día antes y el mismo día (no avisa de pagos ya " +
+                    "registrados). También avisa al llegar al 80% y al pasarse del presupuesto de una tarjeta " +
+                    "(se fija tocándola) o de una categoría.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
