@@ -105,6 +105,13 @@ Total de cargos  +  ${'$'} 2,374.00
     }
 
     @Test
+    fun `la compra completa listada como A 12 MESES tampoco se duplica como gasto`() {
+        val extra = text + "\n02-Oct-2026 02-Oct-2026 AMAZON A 12 MESES S/I  \$7,000.00"
+        val full = parseStatement(extra)!!.movements.first { it.amount == 7_000.0 }
+        assertTrue(full.isInstallmentCharge)
+    }
+
+    @Test
     fun `texto sin fecha de corte no es un estado compatible`() {
         assertNull(parseStatement("Hola mundo \$ 100.00"))
         assertNotNull(parseStatement(text))

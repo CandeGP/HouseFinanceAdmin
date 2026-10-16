@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.MemberRole
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.lock.AppAuth
+import mx.finanzas.pareja.ui.lock.AppLockState
 import mx.finanzas.pareja.ui.lock.LockPrefs
 import mx.finanzas.pareja.ui.lock.findFragmentActivity
 import mx.finanzas.pareja.ui.session.SessionState
@@ -131,7 +132,8 @@ private fun LockCard() {
             activity = activity,
             title = if (want) "Activar el bloqueo" else "Apagar el bloqueo",
             subtitle = "Confirma que eres tú",
-            onSuccess = { LockPrefs.setEnabled(context, want); enabled = want; message = null },
+            // Al activarlo no se vuelve a pedir la huella de inmediato: acaba de autenticarse.
+            onSuccess = { LockPrefs.setEnabled(context, want); if (want) AppLockState.unlock(); enabled = want; message = null },
             onError = { message = it },
         )
     }

@@ -142,7 +142,7 @@ private val EMBEDDED_CARD = Regex("""\*{3}\s*(\d{4})""")
 private val PLATA_LEADING_CARD = Regex("""^(\d{4})\s+(.*)$""")
 private val PLATA_TRAILING_FX = Regex("""\s+$SIGN_SRC\s*[\d.,]+\s+MXN\s+[\d.]+$""")
 private val RFC_SUFFIX = Regex("""\s*[;|]?\s*RFC:.*$""", RegexOption.IGNORE_CASE)
-private val INSTALLMENT_HINT = Regex("""(?i)(^\d{1,2}\s+DE\s+\d{1,2}\b|\bA\s+MESES\b|\s-\s\d{1,2}/\d{1,2}$|\bMSI\b)""")
+private val INSTALLMENT_HINT = Regex("""(?i)(^\d{1,2}\s+DE\s+\d{1,2}\b|\bA\s+(?:\d{1,2}\s+)?MESES\b|\s-\s\d{1,2}/\d{1,2}$|\bMSI\b)""")
 
 private val DIGITAL_CARD_SUFFIX = Regex("""\s*;\s*Tarjeta\s+(?:digital|virtual).*$""", RegexOption.IGNORE_CASE)
 private val INSTALLMENT_SUFFIX = Regex("""\s+-\s*\d{1,2}/\d{1,2}$""")
@@ -178,7 +178,9 @@ private fun markInstallmentCharges(
     installments: List<StatementInstallment>,
 ): List<StatementMovement> = movements.map { movement ->
     val matches = !movement.isInstallmentCharge && movement.amount > 0 && installments.any { i ->
-        abs(i.requiredPayment - movement.amount) < AMOUNT_EPSILON &&
+        // BBVA además lista la compra completa ("TOMMY A 03 MESES S/I", monto original): es la misma compra.
+        (abs(i.requiredPayment - movement.amount) < AMOUNT_EPSILON ||
+            abs(i.originalAmount - movement.amount) < AMOUNT_EPSILON) &&
             words(i.description).intersect(words(movement.description)).isNotEmpty()
     }
     if (matches) movement.copy(isInstallmentCharge = true) else movement

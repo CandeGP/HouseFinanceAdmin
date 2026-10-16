@@ -45,7 +45,9 @@ fun LockGate(content: @Composable () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    if (AppLockState.locked) LockScreen() else content()
+    // Con el bloqueo apagado nunca se pinta la pantalla de bloqueo (el estado arranca "bloqueado" y, si no,
+    // alcanzaba a pedir la huella antes de que ON_START lo desbloqueara).
+    if (AppLockState.locked && LockPrefs.isEffective(context)) LockScreen() else content()
 }
 
 @Composable
