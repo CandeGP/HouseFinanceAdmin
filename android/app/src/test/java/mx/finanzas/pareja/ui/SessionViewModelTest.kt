@@ -90,6 +90,38 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun `sin red al abrir con sesion guardada ofrece reintentar y no pide login`() {
+        repo.userId = "u1"
+        repo.membersFailWith = java.net.UnknownHostException("Unable to resolve host")
+        val vm = SessionViewModel(repo)
+        assertEquals(SessionState.Offline, vm.state.value)
+        assertEquals("Sin conexión con el servidor", vm.message.value)
+        assertEquals("u1", repo.userId)
+    }
+
+    @Test
+    fun `reintentar con red recupera la sesion`() {
+        repo.userId = "u1"
+        repo.members += Member("h1", "u1", MemberRole.ADMIN, "Yo")
+        repo.membersFailWith = java.net.UnknownHostException("Unable to resolve host")
+        val vm = SessionViewModel(repo)
+
+        repo.membersFailWith = null
+        vm.refresh()
+
+        assertTrue(vm.state.value is SessionState.Ready)
+        assertEquals(null, vm.message.value)
+    }
+
+    @Test
+    fun `un error que no es de red al abrir si cierra la sesion`() {
+        repo.userId = "u1"
+        repo.membersFailWith = Exception("JWT expired")
+        val vm = SessionViewModel(repo)
+        assertEquals(SessionState.SignedOut, vm.state.value)
+    }
+
+    @Test
     fun `cerrar sesion vuelve a SignedOut`() {
         repo.userId = "u1"
         val vm = SessionViewModel(repo)

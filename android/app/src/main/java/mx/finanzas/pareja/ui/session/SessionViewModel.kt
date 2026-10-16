@@ -9,11 +9,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.Member
+import mx.finanzas.pareja.data.isConnectivityError
 import mx.finanzas.pareja.data.userMessage
 
 sealed interface SessionState {
     data object Loading : SessionState
     data object SignedOut : SessionState
+
+    /** Hay sesión guardada pero no se pudo llegar al servidor al abrir: se ofrece reintentar, no volver a entrar. */
+    data object Offline : SessionState
     data class NeedsHousehold(val userId: String) : SessionState
     data class Ready(val userId: String, val me: Member, val members: List<Member>) : SessionState
 }
@@ -82,6 +86,15 @@ class SessionViewModel(private val repo: FinanceRepository) : ViewModel() {
         return SessionState.Ready(uid, me, members.filter { it.householdId == me.householdId })
     }
 
+    // La sesión se lee del almacenamiento local: responde aunque no haya red.
+    private suspend fun hasSavedSession(): Boolean = try {
+        repo.currentUserId() != null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        false
+    }
+
     private fun launchAction(action: suspend () -> Unit) {
         viewModelScope.launch {
             _busy.value = true
@@ -93,7 +106,8 @@ class SessionViewModel(private val repo: FinanceRepository) : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 _message.value = userMessage(e)
-                if (_state.value == SessionState.Loading) _state.value = SessionState.SignedOut
+                val starting = _state.value == SessionState.Loading || _state.value == SessionState.Offline
+                if (starting) _state.value = if (isConnectivityError(e) && hasSavedSession()) SessionState.Offline else SessionState.SignedOut
             } finally {
                 _busy.value = false
             }

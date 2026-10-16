@@ -68,7 +68,13 @@ class FakeFinanceRepository : FinanceRepository {
         userId = null
     }
 
-    override suspend fun members(): List<Member> = members.toList()
+    /** Falla solo `members()` (la consulta que hace la app al abrir), sin afectar el resto. */
+    var membersFailWith: Exception? = null
+
+    override suspend fun members(): List<Member> {
+        membersFailWith?.let { throw it }
+        return members.toList()
+    }
 
     override suspend fun createHousehold(name: String, displayName: String): String {
         failIfNeeded()
@@ -85,6 +91,14 @@ class FakeFinanceRepository : FinanceRepository {
     }
 
     override suspend fun categories(): List<Category> = categoryList
+
+    val addedCategories = mutableListOf<String>()
+
+    override suspend fun addCategory(householdId: String, name: String) {
+        failIfNeeded()
+        addedCategories += name
+        categoryList = categoryList + Category("cat-new-${addedCategories.size}", name)
+    }
     override suspend fun cards(): List<Card> = cardList
 
     override suspend fun addCard(card: NewCard) {
@@ -207,6 +221,8 @@ class FakeFinanceRepository : FinanceRepository {
         lastPaymentRange = from to toExclusive
         return paymentList.filter { it.paidAt >= from && it.paidAt < toExclusive }
     }
+
+    override suspend fun payees(): List<String> = paymentList.mapNotNull { it.counterparty }
 
     override suspend fun manualPayment(id: String): ManualPayment? = paymentList.firstOrNull { it.id == id }
 

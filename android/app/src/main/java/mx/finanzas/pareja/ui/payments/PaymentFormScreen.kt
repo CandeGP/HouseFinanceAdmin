@@ -15,11 +15,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +59,7 @@ import kotlinx.datetime.toLocalDateTime
 import mx.finanzas.pareja.data.PaymentMethod
 import mx.finanzas.pareja.domain.PaymentField
 import mx.finanzas.pareja.domain.formatDateEs
+import mx.finanzas.pareja.domain.matchingPayees
 import mx.finanzas.pareja.domain.timeText
 import mx.finanzas.pareja.ui.components.DropdownField
 import mx.finanzas.pareja.ui.components.ErrorText
@@ -70,6 +76,7 @@ fun PaymentFormScreen(
     val scope = rememberCoroutineScope()
     var showDatePicker by remember { mutableStateOf(false) }
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var newCategory by remember { mutableStateOf<String?>(null) } // null = diálogo cerrado
 
     LaunchedEffect(state.saved) { if (state.saved) onDone(true) }
 
@@ -173,13 +180,11 @@ fun PaymentFormScreen(
                 enabled = !state.readOnly,
             ) { Text("Usar fecha y hora actuales") }
 
-            OutlinedTextField(
+            PayeeField(
                 value = draft.counterparty,
-                onValueChange = { vm.onDraftChange(draft.copy(counterparty = it)) },
-                label = { Text("Pagado a (opcional)") },
-                singleLine = true,
+                payees = state.payees,
                 enabled = !state.readOnly,
-                modifier = Modifier.fillMaxWidth(),
+                onChange = { vm.onDraftChange(draft.copy(counterparty = it)) },
             )
             if (draft.method == PaymentMethod.TRANSFER) {
                 OutlinedTextField(
@@ -200,6 +205,9 @@ fun PaymentFormScreen(
                 enabled = !state.readOnly,
                 noneLabel = "Sin categoría",
             )
+            if (!state.readOnly) {
+                TextButton(onClick = { newCategory = "" }) { Text("Agregar categoría") }
+            }
             OutlinedTextField(
                 value = draft.notes,
                 onValueChange = { vm.onDraftChange(draft.copy(notes = it)) },
@@ -235,6 +243,28 @@ fun PaymentFormScreen(
         }
     }
 
+    newCategory?.let { name ->
+        AlertDialog(
+            onDismissRequest = { newCategory = null },
+            title = { Text("Nueva categoría") },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { newCategory = it },
+                    label = { Text("Nombre") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { vm.addCategory(name); newCategory = null },
+                    enabled = name.isNotBlank(),
+                ) { Text("Agregar") }
+            },
+            dismissButton = { TextButton(onClick = { newCategory = null }) { Text("Cancelar") } },
+        )
+    }
+
     if (showDatePicker) {
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = draft.date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
@@ -252,6 +282,31 @@ fun PaymentFormScreen(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") } },
         ) { DatePicker(state = pickerState) }
+    }
+}
+
+/** Campo "Pagado a": se puede escribir un nombre nuevo o elegir uno de los ya usados, para no teclearlo igual cada vez. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PayeeField(value: String, payees: List<String>, enabled: Boolean, onChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val matches = matchingPayees(payees, value)
+    val open = expanded && enabled && matches.isNotEmpty()
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { onChange(it); expanded = true },
+            label = { Text("Pagado a (opcional)") },
+            singleLine = true,
+            enabled = enabled,
+            trailingIcon = { if (payees.isNotEmpty()) ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable, enabled).fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { expanded = false }) {
+            matches.forEach { payee ->
+                DropdownMenuItem(text = { Text(payee) }, onClick = { onChange(payee); expanded = false })
+            }
+        }
     }
 }
 

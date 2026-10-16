@@ -20,6 +20,7 @@ import mx.finanzas.pareja.domain.ManualPaymentDraft
 import mx.finanzas.pareja.domain.PaymentDraftResult
 import mx.finanzas.pareja.domain.PaymentField
 import mx.finanzas.pareja.domain.ValidManualPayment
+import mx.finanzas.pareja.domain.distinctPayees
 import mx.finanzas.pareja.domain.evidencePath
 import mx.finanzas.pareja.domain.localDate
 import mx.finanzas.pareja.domain.timeText
@@ -30,6 +31,7 @@ class PendingEvidence(val bytes: ByteArray, val mimeType: String)
 data class PaymentFormUiState(
     val draft: ManualPaymentDraft,
     val categories: List<Category> = emptyList(),
+    val payees: List<String> = emptyList(),
     val errors: Map<PaymentField, String> = emptyMap(),
     val loading: Boolean = true,
     val saving: Boolean = false,
@@ -77,6 +79,29 @@ class ManualPaymentFormViewModel(
         _state.update { it.copy(message = text) }
     }
 
+    /** Crea la categoría (o reutiliza una con el mismo nombre) y la deja elegida en el formulario. */
+    fun addCategory(name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return reportMessage("Escribe el nombre de la categoría")
+        _state.value.categories.firstOrNull { it.name.equals(clean, ignoreCase = true) }?.let { same ->
+            return _state.update { it.copy(draft = it.draft.copy(categoryId = same.id)) }
+        }
+        viewModelScope.launch {
+            try {
+                repo.addCategory(householdId, clean)
+                val categories = repo.categories()
+                val created = categories.firstOrNull { it.name.equals(clean, ignoreCase = true) }
+                _state.update {
+                    it.copy(categories = categories, draft = it.draft.copy(categoryId = created?.id ?: it.draft.categoryId))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = userMessage(e)) }
+            }
+        }
+    }
+
     fun attachEvidence(bytes: ByteArray, mimeType: String) {
         if (evidencePath(householdId, userId, "x", mimeType) == null) {
             reportMessage(UNSUPPORTED_EVIDENCE)
@@ -110,10 +135,11 @@ class ManualPaymentFormViewModel(
         viewModelScope.launch {
             try {
                 val categories = repo.categories()
+                val payees = distinctPayees(repo.payees())
                 val existing = editingId?.let { repo.manualPayment(it) }
                 val evidenceUrl = existing?.evidencePath?.let { repo.evidenceUrl(it) }
                 _state.update { state ->
-                    val base = state.copy(categories = categories, loading = false)
+                    val base = state.copy(categories = categories, payees = payees, loading = false)
                     when {
                         editingId != null && existing == null ->
                             base.copy(readOnly = true, message = "No se encontró el pago")

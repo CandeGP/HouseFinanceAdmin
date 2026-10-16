@@ -51,6 +51,9 @@ interface FinanceRepository {
 
     // Catálogos
     suspend fun categories(): List<Category>
+
+    /** Crea una categoría del hogar; los miembros pueden agregar las suyas. */
+    suspend fun addCategory(householdId: String, name: String)
     suspend fun cards(): List<Card>
     suspend fun addCard(card: NewCard)
     suspend fun updateCard(id: String, patch: CardPatch)
@@ -101,6 +104,9 @@ interface FinanceRepository {
     // Pagos en efectivo / transferencia
     suspend fun manualPayments(from: Instant, toExclusive: Instant): List<ManualPayment>
     suspend fun manualPayment(id: String): ManualPayment?
+
+    /** "Pagado a" de los pagos ya registrados (más recientes primero, con repetidos), para sugerirlos. */
+    suspend fun payees(): List<String>
     suspend fun addManualPayment(payment: NewManualPayment)
     suspend fun updateManualPayment(id: String, patch: ManualPaymentPatch)
     suspend fun deleteManualPayment(id: String)

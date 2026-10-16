@@ -39,6 +39,43 @@ class ManualPaymentFormViewModelTest {
     )
 
     @Test
+    fun `sugiere a quien ya se le pago sin repetidos`() {
+        repo.paymentList += existing().copy(id = "p2", counterparty = "Don Pedro")
+        repo.paymentList += existing().copy(id = "p3", counterparty = "don pedro ")
+        repo.paymentList += existing().copy(id = "p4", counterparty = null)
+        assertEquals(listOf("Don Pedro"), vm().state.value.payees)
+    }
+
+    @Test
+    fun `agregar categoria nueva la crea y la deja elegida`() {
+        val vm = vm()
+        vm.addCategory("  Mascotas ")
+
+        assertEquals(listOf("Mascotas"), repo.addedCategories)
+        val created = vm.state.value.categories.single { it.name == "Mascotas" }
+        assertEquals(created.id, vm.state.value.draft.categoryId)
+    }
+
+    @Test
+    fun `agregar una categoria que ya existe no la duplica y la elige`() {
+        repo.categoryList = listOf(mx.finanzas.pareja.data.Category("cat-gas", "Gasolina"))
+        val vm = vm()
+        vm.addCategory("gasolina")
+
+        assertTrue(repo.addedCategories.isEmpty())
+        assertEquals("cat-gas", vm.state.value.draft.categoryId)
+    }
+
+    @Test
+    fun `categoria sin nombre no se crea`() {
+        val vm = vm()
+        vm.addCategory("   ")
+
+        assertTrue(repo.addedCategories.isEmpty())
+        assertNotNull(vm.state.value.message)
+    }
+
+    @Test
     fun `guardar sin evidencia registra el pago a mi nombre`() {
         val vm = vm()
         fill(vm)

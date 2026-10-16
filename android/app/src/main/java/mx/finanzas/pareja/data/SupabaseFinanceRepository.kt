@@ -8,6 +8,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
@@ -15,6 +16,8 @@ import io.ktor.http.ContentType
 import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -28,6 +31,14 @@ fun createSupabase(url: String, key: String): SupabaseClient =
         install(Postgrest)
         install(Storage)
     }
+
+private const val PAYEES_LOOKBACK = 500L // últimos pagos que se revisan para sugerir "Pagado a"
+
+@Serializable
+private data class NewCategory(@SerialName("household_id") val householdId: String, val name: String)
+
+@Serializable
+private data class PayeeRow(val counterparty: String? = null)
 
 class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRepository {
 
@@ -86,6 +97,10 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         client.postgrest.from("categories").select {
             order("name", Order.ASCENDING)
         }.decodeList<Category>()
+
+    override suspend fun addCategory(householdId: String, name: String) {
+        client.postgrest.from("categories").insert(NewCategory(householdId, name))
+    }
 
     override suspend fun cards(): List<Card> =
         client.postgrest.from("cards").select {
@@ -248,6 +263,12 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
             }
             order("paid_at", Order.DESCENDING)
         }.decodeList<ManualPayment>()
+
+    override suspend fun payees(): List<String> =
+        client.postgrest.from("manual_payments").select(Columns.list("counterparty")) {
+            order("paid_at", Order.DESCENDING)
+            limit(PAYEES_LOOKBACK)
+        }.decodeList<PayeeRow>().mapNotNull { it.counterparty }
 
     override suspend fun manualPayment(id: String): ManualPayment? =
         client.postgrest.from("manual_payments").select {
