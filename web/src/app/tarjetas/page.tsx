@@ -74,6 +74,10 @@ export default function Tarjetas() {
                     <dd className="text-right text-lg font-semibold tracking-[-0.03em]">{mxn(est.cycle_total)}</dd>
                     <dt className="text-muted">MSI restante</dt>
                     <dd className="text-right font-semibold">{mxn(est.msi_remaining)}</dd>
+                    <dt className="font-semibold">Debes en total</dt>
+                    <dd className="text-right text-lg font-bold tracking-[-0.03em]">
+                      {mxn(est.cycle_total + est.msi_remaining)}
+                    </dd>
                   </dl>
                 </>
               ) : (

@@ -55,14 +55,19 @@ private suspend fun recognizePage(recognizer: TextRecognizer, page: PdfRenderer.
     try {
         bitmap.eraseColor(Color.WHITE) // el render es transparente; el OCR necesita fondo blanco
         page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-        val result = recognizer.process(InputImage.fromBitmap(bitmap, 0)).awaitResult()
-        val lines = result.textBlocks.flatMap { it.lines }.mapNotNull { line ->
-            line.boundingBox?.let { OcrLine(line.text, it.left, it.top, it.right, it.bottom) }
-        }
-        return joinOcrRows(lines)
+        return recognizeBitmap(recognizer, bitmap)
     } finally {
         bitmap.recycle()
     }
+}
+
+/** Reconoce el texto de una imagen y lo devuelve por renglones (también lo usa "cargar imagen" en gastos). */
+internal suspend fun recognizeBitmap(recognizer: TextRecognizer, bitmap: Bitmap): String {
+    val result = recognizer.process(InputImage.fromBitmap(bitmap, 0)).awaitResult()
+    val lines = result.textBlocks.flatMap { it.lines }.mapNotNull { line ->
+        line.boundingBox?.let { OcrLine(line.text, it.left, it.top, it.right, it.bottom) }
+    }
+    return joinOcrRows(lines)
 }
 
 private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->

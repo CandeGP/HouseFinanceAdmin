@@ -135,6 +135,11 @@ private fun CardRankItem(rank: CardRank, ownerName: String?) {
                 }
                 Text(formatMxn(est.cycleTotal), style = MaterialTheme.typography.titleMedium)
             }
+            // Deuda total de la tarjeta: lo del ciclo más los meses sin intereses que aún faltan por pagar.
+            Text(
+                "Debes en total: ${formatMxn(est.cycleTotal + est.msiRemaining)}",
+                style = MaterialTheme.typography.titleSmall,
+            )
             Text(
                 "Corte: ${formatDateEs(est.cycleEnd)} · Pago: ${formatDateEs(est.dueDate)}",
                 style = MaterialTheme.typography.bodyMedium,

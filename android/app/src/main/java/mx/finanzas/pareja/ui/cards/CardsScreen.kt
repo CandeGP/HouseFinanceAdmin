@@ -70,6 +70,9 @@ fun CardsScreen(
     onImportStatement: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // Cada quien ve y administra lo suyo: archivadas solo las tuyas, y el PDF solo si ya tienes una tarjeta.
+    val myArchived = state.archived.filter { it.ownerId == userId }
+    val hasOwnCard = state.cards.any { it.ownerId == userId }
     var showForm by remember { mutableStateOf(openAddOnStart) }
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
@@ -106,10 +109,13 @@ fun CardsScreen(
             )
             ErrorText(state.message, Modifier.padding(horizontal = 16.dp))
 
-            OutlinedButton(
-                onClick = onImportStatement,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            ) { Text("Importar estado de cuenta (PDF)") }
+            // El estado de cuenta se concilia contra una tarjeta tuya: sin ninguna, el botón no tiene sentido.
+            if (hasOwnCard) {
+                OutlinedButton(
+                    onClick = onImportStatement,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) { Text("Importar estado de cuenta (PDF)") }
+            }
 
             // Siempre se muestra la lista: así "Archivadas" es visible aunque no quede ninguna activa.
             run {
@@ -126,7 +132,20 @@ fun CardsScreen(
                             )
                         }
                     }
-                    items(state.cards, key = { it.id }) { card ->
+                    // Mis tarjetas primero y las de la pareja aparte (solo lectura).
+                    val grouped = state.cards.groupBy { it.ownerId == userId }
+                    for (isMine in listOf(true, false)) {
+                    val group = grouped[isMine].orEmpty()
+                    if (group.isEmpty()) continue
+                    item(key = "header-$isMine") {
+                        Text(
+                            if (isMine) "Mis tarjetas" else "Tarjetas de ${memberNames[group.first().ownerId] ?: "tu pareja"}",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = if (isMine) 0.dp else 12.dp),
+                        )
+                    }
+                    items(group, key = { it.id }) { card ->
                         val mine = card.ownerId == userId
                         val spend = state.spend[card.id]
                         Card(Modifier.fillMaxWidth().let { if (mine) it.clickable { budgetFor = card } else it }) {
@@ -170,16 +189,17 @@ fun CardsScreen(
                             }
                         }
                     }
+                    }
                     run {
                         item {
                             Text(
-                                "Archivadas (${state.archived.size})",
+                                "Archivadas (${myArchived.size})",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 16.dp),
                             )
                         }
-                        if (state.archived.isEmpty()) {
+                        if (myArchived.isEmpty()) {
                             item {
                                 Text(
                                     "Ninguna por ahora. Las tarjetas que archives aparecerán aquí para restaurarlas.",
@@ -188,7 +208,7 @@ fun CardsScreen(
                                 )
                             }
                         }
-                        items(state.archived, key = { "archived-${it.id}" }) { card ->
+                        items(myArchived, key = { "archived-${it.id}" }) { card ->
                             Card(Modifier.fillMaxWidth()) {
                                 Row(
                                     Modifier.padding(12.dp),

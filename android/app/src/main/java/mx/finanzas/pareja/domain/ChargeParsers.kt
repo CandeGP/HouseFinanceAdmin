@@ -89,6 +89,8 @@ private val INCOME_WORDS = Regex(
 private val FOREIGN_CURRENCY = Regex("""\b(?:USD|EUR|CAD|GBP|US\$)\b""", RegexOption.IGNORE_CASE)
 private val BANK_AMOUNT = Regex("""(?:\$|MXN)\s*([\d,]+(?:\.\d{1,2})?)""", RegexOption.IGNORE_CASE)
 private val MERCHANT_AFTER_EN = Regex("""\ben\s+(.+?)(?=\s+con\b|\s+el\b|\s+a\s+las\b|\s+de\s+tu\b|[.,;]|$)""", RegexOption.IGNORE_CASE)
+// "ENERGETICOS ALTIPLANO usó $219.08 para pre-autorizar…" (aviso de Rappi): el comercio va antes de "usó".
+private val MERCHANT_BEFORE_USO = Regex("""^(.+?)\s+us[oó]\s+(?:\$|MXN)""", RegexOption.IGNORE_CASE)
 private val LAST4 = Regex(
     """(?:terminaci[oó]n|terminada\s+en|termina\s+en|ending(?:\s+in)?|[*•·]{2,}|x{2,})\s*(\d{4})\b""",
     RegexOption.IGNORE_CASE,
@@ -115,6 +117,7 @@ private fun parseBankText(n: RawNotification): ParsedCharge? {
     val amount = BANK_AMOUNT.find(text)?.let { parseAmount(it.groupValues[1]) } ?: return null
     val title = cleanMerchant(n.title)
     val merchant = MERCHANT_AFTER_EN.find(text)?.groupValues?.get(1)?.let(::cleanMerchant)
+        ?: MERCHANT_BEFORE_USO.find(text)?.groupValues?.get(1)?.let(::cleanMerchant)
         ?: title?.takeUnless { GENERIC_TITLE.containsMatchIn(it) }
         ?: "Sin comercio"
 

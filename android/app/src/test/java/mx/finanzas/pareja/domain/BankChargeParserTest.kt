@@ -63,6 +63,31 @@ class BankChargeParserTest {
     }
 
     @Test
+    fun `aviso de Rappi con el comercio antes de uso saca comercio y monto`() {
+        val c = parseCharge(
+            bank(
+                "com.grability.rappi", "Se realizó una compra 🤑",
+                "ENERGETICOS ALTIPLANO usó \$219.08 para pre-autorizar una compra con tu RappiCard digital.",
+            ),
+        )!!
+        assertEquals("ENERGETICOS ALTIPLANO", c.merchant)
+        assertEquals(219.08, c.amount, 0.0)
+        assertNull(c.cardLast4)
+    }
+
+    @Test
+    fun `el aviso de Rappi y el de Billetera quedan con el mismo comercio para fusionarse`() {
+        val rappi = parseCharge(
+            bank("com.grability.rappi", "Se realizó una compra", "ENERGETICOS ALTIPLANO usó \$219.08 para pre-autorizar una compra con tu RappiCard digital."),
+        )!!
+        val wallet = parseCharge(
+            RawNotification(ChargeSources.GOOGLE_WALLET, "ENERGETICOS ALTIPLANO", "\$219.08 con Rappicard ••8476", at),
+        )!!
+        assertEquals(wallet.merchant, rappi.merchant)
+        assertEquals(wallet.amount, rappi.amount, 0.0)
+    }
+
+    @Test
     fun `ignora abonos, depositos y promociones`() {
         assertNull(parseCharge(bank("com.bancomer.mbanking", "BBVA", "Recibiste un depósito por \$5,000.00")))
         assertNull(parseCharge(bank("com.nu.production", "Nu", "Abono de \$250.00 a tu tarjeta")))

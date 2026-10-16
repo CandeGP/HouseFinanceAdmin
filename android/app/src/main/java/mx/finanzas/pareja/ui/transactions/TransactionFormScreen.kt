@@ -1,5 +1,7 @@
 package mx.finanzas.pareja.ui.transactions
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,12 +33,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -46,6 +51,7 @@ import mx.finanzas.pareja.domain.DraftField
 import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.domain.parseAmount
+import mx.finanzas.pareja.domain.parseReceipt
 import mx.finanzas.pareja.ui.components.DropdownField
 import mx.finanzas.pareja.ui.components.ErrorText
 
@@ -54,6 +60,20 @@ import mx.finanzas.pareja.ui.components.ErrorText
 fun TransactionFormScreen(vm: TransactionFormViewModel, onDone: (saved: Boolean) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
+    var scanning by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // La imagen se lee en el teléfono (OCR local) y solo autorrellena el formulario; no se guarda ni se sube.
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                scanning = true
+                val text = runCatching { ocrImageText(context, uri) }.getOrDefault("")
+                vm.applyReceipt(parseReceipt(text))
+                scanning = false
+            }
+        }
+    }
 
     LaunchedEffect(state.saved) { if (state.saved) onDone(true) }
 
@@ -82,6 +102,17 @@ fun TransactionFormScreen(vm: TransactionFormViewModel, onDone: (saved: Boolean)
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ErrorText(state.message)
+
+            if (!vm.isEditing && !state.readOnly) {
+                OutlinedButton(
+                    onClick = { pickImage.launch("image/*") },
+                    enabled = !scanning,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (scanning) "Leyendo imagen…" else "Cargar imagen (ticket, voucher o captura)") }
+                state.receiptNote?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
 
             OutlinedTextField(
                 value = draft.merchant,
