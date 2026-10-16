@@ -55,6 +55,8 @@ import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.statements.StatementImportScreen
 import mx.finanzas.pareja.ui.budgets.CategoryBudgetsScreen
 import mx.finanzas.pareja.ui.budgets.CategoryBudgetsViewModel
+import mx.finanzas.pareja.ui.reports.ReportsScreen
+import mx.finanzas.pareja.ui.reports.ReportsViewModel
 import mx.finanzas.pareja.ui.loans.LoansScreen
 import mx.finanzas.pareja.ui.loans.LoansViewModel
 import mx.finanzas.pareja.ui.statements.StatementImportViewModel
@@ -73,6 +75,7 @@ private const val ROUTE_ACCOUNT = "account"
 private const val ROUTE_PAYMENTS = "payments"
 private const val ROUTE_LOANS = "loans"
 private const val ROUTE_CATEGORY_BUDGETS = "category_budgets"
+private const val ROUTE_REPORTS = "reports"
 private const val ROUTE_INBOX = "inbox"
 private const val ROUTE_STATEMENT_IMPORT = "statement_import"
 private const val ROUTE_FORM = "tx_form?id={id}"
@@ -255,7 +258,12 @@ fun MainScaffold(
                     session = session,
                     onSignOut = onSignOut,
                     onOpenBudgets = { nav.navigate(ROUTE_CATEGORY_BUDGETS) },
+                    onOpenReports = { nav.navigate(ROUTE_REPORTS) },
                 )
+            }
+            composable(ROUTE_REPORTS) {
+                val vm: ReportsViewModel = viewModel(factory = viewModelFactory { ReportsViewModel(repo, today()) })
+                ReportsScreen(vm = vm, onBack = { nav.popBackStack() })
             }
             composable(ROUTE_CATEGORY_BUDGETS) {
                 val vm: CategoryBudgetsViewModel = viewModel(

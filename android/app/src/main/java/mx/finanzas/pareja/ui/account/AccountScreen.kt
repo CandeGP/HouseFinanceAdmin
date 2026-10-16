@@ -304,6 +304,7 @@ fun AccountScreen(
     session: SessionState.Ready,
     onSignOut: () -> Unit,
     onOpenBudgets: () -> Unit,
+    onOpenReports: () -> Unit,
 ) {
     val inviteCode by vm.inviteCode.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -356,6 +357,9 @@ fun AccountScreen(
 
         OutlinedButton(onClick = onOpenBudgets, modifier = Modifier.fillMaxWidth()) {
             Text("Presupuestos por categoría")
+        }
+        OutlinedButton(onClick = onOpenReports, modifier = Modifier.fillMaxWidth()) {
+            Text("Reportes: mes contra mes")
         }
         LockCard()
         AlertsCard()

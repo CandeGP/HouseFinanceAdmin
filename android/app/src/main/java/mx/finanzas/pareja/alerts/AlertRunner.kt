@@ -13,6 +13,8 @@ import mx.finanzas.pareja.domain.ALERT_REMINDER_DAYS
 import mx.finanzas.pareja.domain.CardCycles
 import mx.finanzas.pareja.domain.CardMonthSpend
 import mx.finanzas.pareja.domain.CategoryMonthSpend
+import mx.finanzas.pareja.domain.buildLoanViews
+import mx.finanzas.pareja.domain.loanReminders
 import mx.finanzas.pareja.domain.budgetAlerts
 import mx.finanzas.pareja.domain.budgetWarnings
 import mx.finanzas.pareja.domain.categoryBudgetAlerts
@@ -59,8 +61,14 @@ object AlertRunner {
             budgetedSpends.mapNotNull { spend -> categoryById[spend.categoryId]?.let { CategoryMonthSpend(it, spend) } }
         }
 
+        // Préstamos propios abiertos con 15+ días; si falla la consulta no se tumban los demás avisos.
+        val loanAlerts = runCatching {
+            val mine = repo.loans().filter { it.ownerId == userId }
+            loanReminders(buildLoanViews(mine, repo.loanRepayments()), today)
+        }.getOrDefault(emptyList())
+
         val pending = (upcomingAlerts(cycles, today).filter { it.daysLeft in ALERT_REMINDER_DAYS } +
-            budgetAlerts(budgets) + budgetWarnings(budgets) + categoryBudgetAlerts(categorySpends))
+            budgetAlerts(budgets) + budgetWarnings(budgets) + categoryBudgetAlerts(categorySpends) + loanAlerts)
             .filterNot { it.key in settled }
 
         pending
