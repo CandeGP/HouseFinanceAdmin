@@ -70,24 +70,26 @@ fun ageLabel(since: LocalDate, today: LocalDate): String = when (val days = sinc
     else -> "hace $days días"
 }
 
-enum class LoanField { PERSON, AMOUNT }
+enum class LoanField { PERSON, AMOUNT, DATE }
 
-/** Formulario de "Nuevo préstamo". */
+/** Formulario de "Nuevo préstamo". [date] null significa hoy; no puede ser futura. */
 data class LoanDraft(
     val person: String = "",
     val amountText: String = "",
     val direction: LoanDirection = LoanDirection.LENT,
     val method: PaymentMethod = PaymentMethod.TRANSFER,
     val note: String = "",
+    val date: LocalDate? = null,
 ) {
-    fun validate(): LoanResult {
+    fun validate(today: LocalDate): LoanResult {
         val errors = linkedMapOf<LoanField, String>()
         val cleanPerson = person.trim()
         if (cleanPerson.isEmpty()) errors[LoanField.PERSON] = "Escribe con quién"
         val amount = parseAmount(amountText)
         if (amount == null) errors[LoanField.AMOUNT] = "Monto inválido"
+        if (date != null && date > today) errors[LoanField.DATE] = "La fecha no puede ser futura"
         if (errors.isNotEmpty() || amount == null) return LoanResult.Invalid(errors)
-        return LoanResult.Valid(cleanPerson, amount, direction, method, note.trim().ifEmpty { null })
+        return LoanResult.Valid(cleanPerson, amount, direction, method, note.trim().ifEmpty { null }, date ?: today)
     }
 }
 
@@ -98,6 +100,7 @@ sealed interface LoanResult {
         val direction: LoanDirection,
         val method: PaymentMethod,
         val note: String?,
+        val occurredOn: LocalDate,
     ) : LoanResult
 
     data class Invalid(val errors: Map<LoanField, String>) : LoanResult

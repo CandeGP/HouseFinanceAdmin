@@ -118,19 +118,38 @@ class LoansTest {
         assertEquals("hace 15 días", ageLabel(LocalDate(2026, 10, 1), today))
     }
 
+    private val today = LocalDate(2026, 10, 16)
+
     @Test
     fun `nuevo prestamo exige persona y monto`() {
-        val bad = LoanDraft(person = "  ", amountText = "abc").validate() as LoanResult.Invalid
+        val bad = LoanDraft(person = "  ", amountText = "abc").validate(today) as LoanResult.Invalid
         assertEquals(setOf(LoanField.PERSON, LoanField.AMOUNT), bad.errors.keys)
 
         val ok = LoanDraft(
             person = " Hermana ", amountText = "$300", direction = LoanDirection.BORROWED,
             method = PaymentMethod.CASH, note = " para la renta ",
-        ).validate()
+        ).validate(today)
         assertEquals(
-            LoanResult.Valid("Hermana", 300.0, LoanDirection.BORROWED, PaymentMethod.CASH, "para la renta"),
+            LoanResult.Valid("Hermana", 300.0, LoanDirection.BORROWED, PaymentMethod.CASH, "para la renta", today),
             ok,
         )
+    }
+
+    @Test
+    fun `sin fecha el prestamo es de hoy y una fecha anterior se respeta`() {
+        val sinFecha = LoanDraft(person = "Ana", amountText = "50").validate(today) as LoanResult.Valid
+        assertEquals(today, sinFecha.occurredOn)
+
+        val antes = LocalDate(2026, 10, 1)
+        val conFecha = LoanDraft(person = "Ana", amountText = "50", date = antes).validate(today) as LoanResult.Valid
+        assertEquals(antes, conFecha.occurredOn)
+    }
+
+    @Test
+    fun `una fecha futura se rechaza`() {
+        val bad = LoanDraft(person = "Ana", amountText = "50", date = LocalDate(2026, 10, 17))
+            .validate(today) as LoanResult.Invalid
+        assertEquals(mapOf(LoanField.DATE to "La fecha no puede ser futura"), bad.errors)
     }
 
     @Test

@@ -27,8 +27,8 @@ android {
         if (project.hasProperty("demo")) applicationIdSuffix = ".demo"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.6.0"
+        versionCode = 14
+        versionName = "1.6.1"
 
         buildConfigField("String", "SUPABASE_URL", "\"${prop("supabase.url", "http://10.0.2.2:54321")}\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${prop("supabase.key", "")}\"")

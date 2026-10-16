@@ -18,17 +18,22 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,7 +46,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import mx.finanzas.pareja.data.LoanDirection
 import mx.finanzas.pareja.data.LoanRepayment
 import mx.finanzas.pareja.data.PaymentMethod
@@ -152,6 +161,7 @@ fun LoansScreen(
         NewLoanDialog(
             people = state.people,
             errors = state.loanErrors,
+            today = today,
             onDismiss = { showNew = false; vm.consumeSaved() },
             onEdit = vm::consumeSaved,
             onSave = vm::addLoan,
@@ -315,14 +325,17 @@ private fun MethodChips(method: PaymentMethod, onChange: (PaymentMethod) -> Unit
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun NewLoanDialog(
     people: List<String>,
     errors: Map<LoanField, String>,
+    today: LocalDate,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onSave: (LoanDraft) -> Unit,
 ) {
     var draft by remember { mutableStateOf(LoanDraft()) }
+    var showPicker by remember { mutableStateOf(false) }
     // Al volver a escribir se quita el error anterior.
     LaunchedEffect(draft) { if (errors.isNotEmpty()) onEdit() }
     AlertDialog(
@@ -360,6 +373,11 @@ private fun NewLoanDialog(
                     supportingText = errors[LoanField.AMOUNT]?.let { { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedButton(onClick = { showPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    val date = draft.date
+                    Text("Fecha: " + if (date == null || date == today) "hoy" else formatDateEs(date))
+                }
+                errors[LoanField.DATE]?.let { ErrorText(it) }
                 MethodChips(draft.method) { draft = draft.copy(method = it) }
                 OutlinedTextField(
                     value = draft.note,
@@ -372,6 +390,28 @@ private fun NewLoanDialog(
         confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
+
+    if (showPicker) {
+        val todayMillis = today.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = (draft.date ?: today).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis // sin fechas futuras
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        draft = draft.copy(date = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date)
+                    }
+                    showPicker = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancelar") } },
+        ) { DatePicker(state = pickerState) }
+    }
 }
 
 @Composable

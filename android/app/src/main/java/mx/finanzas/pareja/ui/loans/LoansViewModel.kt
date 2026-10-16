@@ -75,13 +75,13 @@ class LoansViewModel(
     }
 
     fun addLoan(draft: LoanDraft) {
-        when (val result = draft.validate()) {
+        when (val result = draft.validate(today)) {
             is LoanResult.Invalid -> _state.update { it.copy(loanErrors = result.errors, saved = false) }
             is LoanResult.Valid -> write {
                 repo.addLoan(
                     NewLoan(
                         householdId = householdId, ownerId = userId, person = result.person,
-                        direction = result.direction, amount = result.amount, occurredOn = today,
+                        direction = result.direction, amount = result.amount, occurredOn = result.occurredOn,
                         method = result.method, note = result.note,
                     ),
                 )

@@ -77,6 +77,23 @@ class LoansViewModelTest {
     }
 
     @Test
+    fun `un prestamo de dias atras se guarda con su fecha`() {
+        val vm = vm()
+        vm.addLoan(LoanDraft(person = "Ana", amountText = "80", date = LocalDate(2026, 10, 10)))
+
+        assertEquals(LocalDate(2026, 10, 10), repo.addedLoans.single().occurredOn)
+    }
+
+    @Test
+    fun `una fecha futura no llega al servidor`() {
+        val vm = vm()
+        vm.addLoan(LoanDraft(person = "Ana", amountText = "80", date = LocalDate(2026, 10, 20)))
+
+        assertTrue(repo.addedLoans.isEmpty())
+        assertEquals(setOf(LoanField.DATE), vm.state.value.loanErrors.keys)
+    }
+
+    @Test
     fun `un prestamo invalido no llega al servidor y muestra los errores`() {
         val vm = vm()
         vm.addLoan(LoanDraft(person = "", amountText = "0"))
