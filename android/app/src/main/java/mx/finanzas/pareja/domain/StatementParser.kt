@@ -137,6 +137,12 @@ private val INSTALLMENT_LINE = Regex(
     RegexOption.IGNORE_CASE,
 )
 
+// Compras a meses CON intereses (BBVA): <fecha> <desc> $original $pendiente $interés $IVA $requerido <n> de <m> <tasa>%
+private val INTEREST_INSTALLMENT_LINE = Regex(
+    """^($DATE_SRC)\s+(.+?)\s+(\$\s*[\d,]+\.\d{2})\s+(\$\s*[\d,]+\.\d{2})\s+\$\s*[\d,]+\.\d{2}\s+\$\s*[\d,]+\.\d{2}\s+(\$\s*[\d,]+\.\d{2})\s+(\d{1,2})\s*(?:de|/)\s*(\d{1,2})\s+[\d.]+\s*%""",
+    RegexOption.IGNORE_CASE,
+)
+
 private val CARD_CONTINUATION = Regex("""Tarjeta\s+(?:virtual|digital)[^\n]*?\*{2,4}\s*(\d{4})""", RegexOption.IGNORE_CASE)
 private val EMBEDDED_CARD = Regex("""\*{3}\s*(\d{4})""")
 private val PLATA_LEADING_CARD = Regex("""^(\d{4})\s+(.*)$""")
@@ -201,7 +207,8 @@ fun parseStatement(text: String): ParsedStatement? {
         val head = previousLine
         previousLine = line
 
-        INSTALLMENT_LINE.matchEntire(line)?.let { m ->
+        // Con intereses va primero: su renglón tiene 5 montos y el patrón de 3 se comería los dos primeros en la descripción.
+        (INTEREST_INSTALLMENT_LINE.matchEntire(line) ?: INSTALLMENT_LINE.matchEntire(line))?.let { m ->
             val date = parseStatementDate(m.groupValues[1]) ?: return@let
             val current = m.groupValues[6].toInt()
             val total = m.groupValues[7].toInt()
@@ -218,7 +225,7 @@ fun parseStatement(text: String): ParsedStatement? {
             }
             return@let
         }
-        if (INSTALLMENT_LINE.matches(line)) continue
+        if (INTEREST_INSTALLMENT_LINE.matches(line) || INSTALLMENT_LINE.matches(line)) continue
 
         val mv = MOVEMENT_LINE.matchEntire(line)
         if (mv != null) {

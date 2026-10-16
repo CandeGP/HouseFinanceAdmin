@@ -73,3 +73,11 @@ val CardCycleStatus.isSettled: Boolean get() = status == CardPayStatus.PAID
 
 /** Llave del aviso de pago de este ciclo; igual a la que genera [upcomingAlerts]. */
 fun CardCycleStatus.dueAlertKey(cardId: String): String = "$cardId:${AlertKind.DUE}:$dueDate"
+
+/** Lo que aún se debe del último corte cerrado; 0 si está pagado o si no se lleva registro de pagos. */
+val CardCycleStatus?.unpaidAmount: Double
+    get() = when (this?.status) {
+        CardPayStatus.PENDING, CardPayStatus.OVERDUE, CardPayStatus.PARTIAL, CardPayStatus.MINIMUM_ONLY ->
+            remaining.coerceAtLeast(0.0)
+        else -> 0.0
+    }

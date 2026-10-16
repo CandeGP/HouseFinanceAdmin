@@ -27,6 +27,7 @@ import mx.finanzas.pareja.domain.RecurringCharge
 import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.formatDayMonthEs
 import mx.finanzas.pareja.domain.formatMxn
+import mx.finanzas.pareja.domain.unpaidAmount
 import mx.finanzas.pareja.ui.components.CardChip
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
@@ -185,11 +186,20 @@ private fun CardRankItem(rank: CardRank, ownerName: String?, status: CardCycleSt
                 }
                 Text(formatMxn(est.cycleTotal), style = MaterialTheme.typography.titleMedium)
             }
-            // Deuda total de la tarjeta: lo del ciclo más los meses sin intereses que aún faltan por pagar.
+            // Deuda total: lo del corte anterior sin pagar + lo del ciclo + los meses sin intereses que faltan.
+            val unpaid = status.unpaidAmount
             Text(
-                "Debes en total: ${formatMxn(est.cycleTotal + est.msiRemaining)}",
+                "Debes en total: ${formatMxn(unpaid + est.cycleTotal + est.msiRemaining)}",
                 style = MaterialTheme.typography.titleSmall,
             )
+            if (unpaid > 0) {
+                Text(
+                    "Incluye ${formatMxn(unpaid)} del corte anterior sin pagar. Es una estimación: puede diferir " +
+                        "del saldo del banco (intereses, compras a meses ya facturadas).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 "Corte: ${formatDateEs(est.cycleEnd)} · Pago: ${formatDateEs(est.dueDate)}",
                 style = MaterialTheme.typography.bodyMedium,

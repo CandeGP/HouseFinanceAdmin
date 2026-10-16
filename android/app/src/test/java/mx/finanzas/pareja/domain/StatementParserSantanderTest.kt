@@ -112,6 +112,19 @@ Total de cargos  +  ${'$'} 2,374.00
     }
 
     @Test
+    fun `una compra a meses con intereses toma el monto original y el pago requerido`() {
+        val extra = text +
+            "\n23-nov-2025 EFECTIVO INMEDIATO \$5,000.00 \$972.30 \$49.48 \$7.47 \$513.83 10 de 12 40.00%"
+        val ef = parseStatement(extra)!!.installments.first { it.description.startsWith("EFECTIVO") }
+        assertEquals("EFECTIVO INMEDIATO", ef.description)
+        assertEquals(5_000.0, ef.originalAmount, 0.0)
+        assertEquals(972.30, ef.pendingBalance, 0.0)
+        assertEquals(513.83, ef.requiredPayment, 0.0)
+        assertEquals(10, ef.current)
+        assertEquals(12, ef.total)
+    }
+
+    @Test
     fun `texto sin fecha de corte no es un estado compatible`() {
         assertNull(parseStatement("Hola mundo \$ 100.00"))
         assertNotNull(parseStatement(text))
