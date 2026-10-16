@@ -21,12 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.domain.CardRank
 import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.ui.components.CardChip
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
+import mx.finanzas.pareja.ui.components.PayStatusText
 import mx.finanzas.pareja.ui.components.ScopeToggle
 
 @Composable
@@ -83,7 +85,11 @@ fun DashboardScreen(
             ) {
                 item { TotalsCard(state.summary.totalCycle, state.summary.totalMsiRemaining, state.summary.topCard?.name) }
                 items(state.summary.ranking, key = { it.view.card.id }) { rank ->
-                    CardRankItem(rank, ownerName = memberNames[rank.view.card.ownerId])
+                    CardRankItem(
+                        rank,
+                        ownerName = memberNames[rank.view.card.ownerId],
+                        status = state.statuses[rank.view.card.id],
+                    )
                 }
             }
         }
@@ -110,7 +116,7 @@ private fun TotalsCard(totalCycle: Double, msiRemaining: Double, topCardName: St
 }
 
 @Composable
-private fun CardRankItem(rank: CardRank, ownerName: String?) {
+private fun CardRankItem(rank: CardRank, ownerName: String?, status: CardCycleStatus?) {
     val card = rank.view.card
     val est = rank.view.estimate
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -144,6 +150,7 @@ private fun CardRankItem(rank: CardRank, ownerName: String?) {
                 "Corte: ${formatDateEs(est.cycleEnd)} · Pago: ${formatDateEs(est.dueDate)}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            status?.let { PayStatusText(it) }
             if (est.cycleMsiTotal > 0) {
                 Text(
                     "Incluye ${formatMxn(est.cycleMsiTotal)} de mensualidades · Saldo MSI: ${formatMxn(est.msiRemaining)}",

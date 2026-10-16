@@ -13,12 +13,18 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.Card
+import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardEditPatch
+import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
+import mx.finanzas.pareja.data.NewCardPayment
+import mx.finanzas.pareja.data.cycleStatuses
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardDraft
+import mx.finanzas.pareja.domain.CardPaymentDraft
+import mx.finanzas.pareja.domain.CardPaymentResult
 import mx.finanzas.pareja.domain.CardDraftResult
 import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardEditResult
@@ -37,6 +43,11 @@ data class CardsUiState(
     /** Errores del formulario de edición y señal de que se guardó (para cerrar el diálogo). */
     val editErrors: Map<CardField, String> = emptyMap(),
     val edited: Boolean = false,
+    /** Cómo va el pago del último ciclo cerrado de cada tarjeta, y los pagos registrados en ese ciclo. */
+    val statuses: Map<String, CardCycleStatus> = emptyMap(),
+    val payments: Map<String, List<CardPayment>> = emptyMap(),
+    val paymentError: String? = null,
+    val paymentSaved: Boolean = false,
 )
 
 class CardsViewModel(
@@ -59,7 +70,15 @@ class CardsViewModel(
                 val spend = active.filter { it.monthlyBudget != null }
                     .mapNotNull { card -> repo.cardMonthSpend(card.id, today)?.let { card.id to it } }
                     .toMap()
-                _state.update { it.copy(cards = active, archived = archived, spend = spend, loading = false) }
+                val statuses = repo.cycleStatuses(active.map { it.id }, today)
+                val payments = statuses.filterValues { it.paidAmount > 0 }
+                    .mapValues { (cardId, status) -> repo.cardPayments(cardId, status.cutoffDate) }
+                _state.update {
+                    it.copy(
+                        cards = active, archived = archived, spend = spend, statuses = statuses,
+                        payments = payments, loading = false,
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -131,6 +150,46 @@ class CardsViewModel(
     }
 
     fun consumeEdited() = _state.update { it.copy(edited = false, editErrors = emptyMap()) }
+
+    /** Registra un pago a una tarjeta propia para el ciclo que indica [status]. */
+    fun registerPayment(card: Card, status: CardCycleStatus, draft: CardPaymentDraft) {
+        if (card.ownerId != userId) return
+        when (val result = draft.validate()) {
+            is CardPaymentResult.Invalid -> _state.update { it.copy(paymentError = result.message, paymentSaved = false) }
+            is CardPaymentResult.Valid -> viewModelScope.launch {
+                try {
+                    repo.addCardPayment(
+                        NewCardPayment(
+                            householdId = householdId, ownerId = userId, cardId = card.id,
+                            cutoffDate = status.cutoffDate, amount = result.amount,
+                            method = result.method, notes = result.notes,
+                        ),
+                    )
+                    _state.update { it.copy(paymentError = null, paymentSaved = true) }
+                    load()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(message = userMessage(e)) }
+                }
+            }
+        }
+    }
+
+    fun deletePayment(id: String) {
+        viewModelScope.launch {
+            try {
+                repo.deleteCardPayment(id)
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = userMessage(e)) }
+            }
+        }
+    }
+
+    fun consumePaymentSaved() = _state.update { it.copy(paymentSaved = false, paymentError = null) }
 
     /** `amount` null quita el presupuesto. Un monto cero o negativo se rechaza antes de llegar al servidor. */
     fun setBudget(id: String, amount: Double?) {

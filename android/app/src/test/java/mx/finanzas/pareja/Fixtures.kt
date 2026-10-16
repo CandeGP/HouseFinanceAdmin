@@ -2,6 +2,8 @@ package mx.finanzas.pareja
 
 import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.data.Card
+import mx.finanzas.pareja.data.CardCycleStatus
+import mx.finanzas.pareja.data.CardPayStatus
 import mx.finanzas.pareja.data.CycleEstimate
 import mx.finanzas.pareja.data.PaymentMode
 import mx.finanzas.pareja.data.Transaction
@@ -17,6 +19,11 @@ fun estimate(cycleTotal: Double, msiRemaining: Double = 0.0, limit: Double = 10_
     cycleContadoTotal = cycleTotal, cycleMsiTotal = 0.0, cycleTotal = cycleTotal,
     msiRemaining = msiRemaining, creditLimit = limit,
     usagePct = if (limit > 0) (cycleTotal + msiRemaining) / limit * 100 else 0.0,
+)
+
+fun cycleStatus(status: CardPayStatus, target: Double = 1000.0, paid: Double = 0.0) = CardCycleStatus(
+    cutoffDate = LocalDate(2026, 10, 10), dueDate = LocalDate(2026, 10, 25), targetAmount = target,
+    targetSource = "statement", paidAmount = paid, remaining = maxOf(0.0, target - paid), status = status,
 )
 
 fun tx(

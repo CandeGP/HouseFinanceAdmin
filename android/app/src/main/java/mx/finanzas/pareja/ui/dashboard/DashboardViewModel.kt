@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.FinanceRepository
+import mx.finanzas.pareja.data.cycleStatuses
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardCycleView
 import mx.finanzas.pareja.domain.DashboardSummary
@@ -25,6 +27,8 @@ data class DashboardUiState(
     val error: String? = null,
     /** Cobros capturados automáticamente que esperan revisión. */
     val pendingCount: Int = 0,
+    /** Cómo va el pago del último ciclo cerrado de cada tarjeta (por id). */
+    val statuses: Map<String, CardCycleStatus> = emptyMap(),
 )
 
 class DashboardViewModel(
@@ -51,7 +55,8 @@ class DashboardViewModel(
                     .mapNotNull { card -> repo.cycleEstimate(card.id, ref)?.let { CardCycleView(card, it) } }
                 val pending = runCatching { repo.pendingTransactions().count { it.ownerId == userId } }
                     .getOrDefault(0)
-                _state.update { it.copy(pendingCount = pending) }
+                val statuses = repo.cycleStatuses(allViews.map { it.card.id }, ref)
+                _state.update { it.copy(pendingCount = pending, statuses = statuses) }
                 publish(loading = false)
             } catch (e: CancellationException) {
                 throw e

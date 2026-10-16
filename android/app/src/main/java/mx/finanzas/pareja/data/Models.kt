@@ -211,3 +211,51 @@ data class ManualPaymentPatch(
     val notes: String?,
     @SerialName("evidence_path") val evidencePath: String?,
 )
+
+/** Estado de pago del último ciclo cerrado de una tarjeta (RPC `card_cycle_status`). */
+@Serializable
+enum class CardPayStatus {
+    @SerialName("paid") PAID,
+    @SerialName("minimum_only") MINIMUM_ONLY,
+    @SerialName("partial") PARTIAL,
+    @SerialName("pending") PENDING,
+    @SerialName("overdue") OVERDUE,
+    @SerialName("untracked") UNTRACKED,
+}
+
+@Serializable
+data class CardCycleStatus(
+    @SerialName("cutoff_date") val cutoffDate: LocalDate,
+    @SerialName("due_date") val dueDate: LocalDate,
+    @SerialName("target_amount") val targetAmount: Double,
+    @SerialName("target_source") val targetSource: String,
+    @SerialName("minimum_payment") val minimumPayment: Double? = null,
+    @SerialName("paid_amount") val paidAmount: Double,
+    val remaining: Double,
+    val status: CardPayStatus,
+)
+
+/** Pago hecho a una tarjeta, ligado al ciclo (fecha de corte) que cubre. */
+@Serializable
+data class CardPayment(
+    val id: String,
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("card_id") val cardId: String,
+    @SerialName("cutoff_date") val cutoffDate: LocalDate,
+    val amount: Double,
+    @SerialName("paid_at") val paidAt: Instant,
+    val method: PaymentMethod,
+    val notes: String? = null,
+)
+
+@Serializable
+data class NewCardPayment(
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("card_id") val cardId: String,
+    @SerialName("cutoff_date") val cutoffDate: LocalDate,
+    val amount: Double,
+    val method: PaymentMethod,
+    val notes: String? = null,
+)

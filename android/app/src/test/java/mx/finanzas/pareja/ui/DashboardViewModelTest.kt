@@ -4,6 +4,8 @@ import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.FakeFinanceRepository
 import mx.finanzas.pareja.MainDispatcherRule
 import mx.finanzas.pareja.card
+import mx.finanzas.pareja.cycleStatus
+import mx.finanzas.pareja.data.CardPayStatus
 import mx.finanzas.pareja.estimate
 import mx.finanzas.pareja.ui.dashboard.DashboardViewModel
 import mx.finanzas.pareja.ui.dashboard.Scope
@@ -35,6 +37,17 @@ class DashboardViewModelTest {
         assertEquals(Scope.BOTH, s.scope)
         assertEquals(listOf("mine-b", "partner", "mine-a"), s.summary.ranking.map { it.view.card.id })
         assertEquals(1500.0, s.summary.totalCycle, 0.0)
+    }
+
+    @Test
+    fun `carga el estado de pago de las tarjetas visibles`() {
+        repo.cycleStatuses["mine-a"] = cycleStatus(CardPayStatus.PAID, paid = 1000.0)
+        repo.cycleStatuses["partner"] = cycleStatus(CardPayStatus.PENDING)
+        val s = vm().state.value
+
+        assertEquals(CardPayStatus.PAID, s.statuses["mine-a"]!!.status)
+        assertEquals(CardPayStatus.PENDING, s.statuses["partner"]!!.status)
+        assertEquals(null, s.statuses["mine-b"])
     }
 
     @Test

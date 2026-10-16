@@ -162,6 +162,35 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         }
     }
 
+    // ---- Pagos a tarjeta
+    override suspend fun cardCycleStatus(cardId: String, ref: LocalDate): CardCycleStatus? =
+        client.postgrest.rpc(
+            "card_cycle_status",
+            buildJsonObject {
+                put("p_card", cardId)
+                put("p_ref", ref.toString())
+            },
+        ).decodeList<CardCycleStatus>().firstOrNull()
+
+    override suspend fun cardPayments(cardId: String, cutoff: LocalDate): List<CardPayment> =
+        client.postgrest.from("card_payments").select {
+            filter {
+                eq("card_id", cardId)
+                eq("cutoff_date", cutoff.toString())
+            }
+            order("paid_at", Order.DESCENDING)
+        }.decodeList<CardPayment>()
+
+    override suspend fun addCardPayment(payment: NewCardPayment) {
+        client.postgrest.from("card_payments").insert(payment)
+    }
+
+    override suspend fun deleteCardPayment(id: String) {
+        client.postgrest.from("card_payments").delete {
+            filter { eq("id", id) }
+        }
+    }
+
     // ---- Gastos
     override suspend fun transactions(from: LocalDate, to: LocalDate): List<Transaction> =
         client.postgrest.from("transactions").select {

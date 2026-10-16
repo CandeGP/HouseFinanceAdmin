@@ -51,6 +51,20 @@ export interface MonthSpend {
   pct: number | null;
 }
 
+export type PayState = "paid" | "minimum_only" | "partial" | "pending" | "overdue" | "untracked";
+
+/** Estado de pago del último ciclo cerrado de una tarjeta (función SQL card_cycle_status). */
+export interface PayStatus {
+  cutoff_date: string;
+  due_date: string;
+  target_amount: number;
+  target_source: "statement" | "estimate";
+  minimum_payment: number | null;
+  paid_amount: number;
+  remaining: number;
+  status: PayState;
+}
+
 export interface Finance {
   members: Member[];
   cards: Card[];
@@ -58,6 +72,7 @@ export interface Finance {
   txs: Tx[];
   estimates: Record<string, Estimate>;
   monthSpend: Record<string, MonthSpend>;
+  payStatus: Record<string, PayStatus>;
 }
 
 const MONTHS_BACK = 6;
@@ -112,6 +127,15 @@ export async function loadFinance(): Promise<Finance> {
       }),
   );
 
+  const statusPairs = await Promise.all(
+    cardRows.map(async (card) => {
+      const { data, error } = await supabase.rpc("card_cycle_status", { p_card: card.id });
+      if (error) throw new Error(error.message);
+      const row = (data as PayStatus[] | null)?.[0];
+      return row ? ([card.id, row] as const) : null;
+    }),
+  );
+
   return {
     members: (members.data ?? []) as Member[],
     cards: cardRows,
@@ -119,5 +143,6 @@ export async function loadFinance(): Promise<Finance> {
     txs: (txs.data ?? []) as Tx[],
     estimates: Object.fromEntries(pairs.filter((p) => p !== null)),
     monthSpend: Object.fromEntries(spendPairs.filter((p) => p !== null)),
+    payStatus: Object.fromEntries(statusPairs.filter((p) => p !== null)),
   };
 }

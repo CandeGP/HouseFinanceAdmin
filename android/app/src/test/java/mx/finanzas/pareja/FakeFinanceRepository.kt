@@ -8,8 +8,11 @@ import mx.finanzas.pareja.data.NewManualPayment
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.CardEditPatch
 import mx.finanzas.pareja.data.CardPatch
+import mx.finanzas.pareja.data.CardCycleStatus
+import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.CycleEstimate
+import mx.finanzas.pareja.data.NewCardPayment
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.Member
 import mx.finanzas.pareja.data.MemberRole
@@ -137,6 +140,28 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun setCardBudget(id: String, amount: Double?) {
         budgetsSet += id to amount
         cardList = cardList.map { if (it.id == id) it.copy(monthlyBudget = amount) else it }
+    }
+
+    // ---- Pagos a tarjeta
+    val cycleStatuses: MutableMap<String, CardCycleStatus> = mutableMapOf()
+    var cardPaymentList: MutableList<CardPayment> = mutableListOf()
+    val addedCardPayments = mutableListOf<NewCardPayment>()
+    val deletedCardPayments = mutableListOf<String>()
+
+    override suspend fun cardCycleStatus(cardId: String, ref: LocalDate): CardCycleStatus? = cycleStatuses[cardId]
+
+    override suspend fun cardPayments(cardId: String, cutoff: LocalDate): List<CardPayment> =
+        cardPaymentList.filter { it.cardId == cardId && it.cutoffDate == cutoff }
+
+    override suspend fun addCardPayment(payment: NewCardPayment) {
+        failIfNeeded()
+        addedCardPayments += payment
+    }
+
+    override suspend fun deleteCardPayment(id: String) {
+        failIfNeeded()
+        deletedCardPayments += id
+        cardPaymentList.removeAll { it.id == id }
     }
 
     override suspend fun transactions(from: LocalDate, to: LocalDate): List<Transaction> {

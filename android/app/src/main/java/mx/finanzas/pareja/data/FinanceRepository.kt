@@ -72,6 +72,14 @@ interface FinanceRepository {
     /** Fija el presupuesto mensual de una tarjeta propia; null lo quita. */
     suspend fun setCardBudget(id: String, amount: Double?)
 
+    /** Estado de pago del último ciclo cerrado de la tarjeta; null si la tarjeta no existe. */
+    suspend fun cardCycleStatus(cardId: String, ref: LocalDate): CardCycleStatus?
+
+    /** Pagos registrados a la tarjeta para el ciclo que cierra en [cutoff], el más reciente primero. */
+    suspend fun cardPayments(cardId: String, cutoff: LocalDate): List<CardPayment>
+    suspend fun addCardPayment(payment: NewCardPayment)
+    suspend fun deleteCardPayment(id: String)
+
     // Gastos
     suspend fun transactions(from: LocalDate, to: LocalDate): List<Transaction>
     suspend fun transaction(id: String): Transaction?

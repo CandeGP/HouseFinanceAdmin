@@ -8,10 +8,13 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.FinanzasApp
+import mx.finanzas.pareja.data.cycleStatuses
 import mx.finanzas.pareja.domain.ALERT_REMINDER_DAYS
 import mx.finanzas.pareja.domain.CardCycles
 import mx.finanzas.pareja.domain.CardMonthSpend
 import mx.finanzas.pareja.domain.budgetAlerts
+import mx.finanzas.pareja.domain.dueAlertKey
+import mx.finanzas.pareja.domain.isSettled
 import mx.finanzas.pareja.domain.reminderKey
 import mx.finanzas.pareja.domain.upcomingAlerts
 
@@ -40,8 +43,14 @@ object AlertRunner {
         val budgets = cards.filter { it.monthlyBudget != null }
             .map { CardMonthSpend(it, repo.cardMonthSpend(it.id, today)) }
 
-        val pending = upcomingAlerts(cycles, today).filter { it.daysLeft in ALERT_REMINDER_DAYS } +
-            budgetAlerts(budgets)
+        // Un pago ya cubierto no se avisa: se descartan los avisos de pago de los ciclos liquidados.
+        val settled = repo.cycleStatuses(cards.filter { it.ownerId == userId }.map { it.id }, today)
+            .filterValues { it.isSettled }
+            .map { (cardId, status) -> status.dueAlertKey(cardId) }
+            .toSet()
+
+        val pending = (upcomingAlerts(cycles, today).filter { it.daysLeft in ALERT_REMINDER_DAYS } +
+            budgetAlerts(budgets)).filterNot { it.key in settled }
 
         pending
             .filterNot { AlertPrefs.wasNotified(app, it.reminderKey) }

@@ -1,8 +1,14 @@
 package mx.finanzas.pareja.ui
 
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.FakeFinanceRepository
+import mx.finanzas.pareja.cycleStatus
+import mx.finanzas.pareja.data.CardPayStatus
+import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.MonthSpend
+import mx.finanzas.pareja.data.PaymentMethod
+import mx.finanzas.pareja.domain.CardPaymentDraft
 import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardField
@@ -122,6 +128,72 @@ class CardsViewModelTest {
 
         assertEquals(emptyList<Pair<String, Double?>>(), repo.budgetsSet)
         assertEquals("El presupuesto debe ser mayor a cero", vm.state.value.message)
+    }
+
+    private fun payment(id: String, cardId: String = "activa") = CardPayment(
+        id = id, householdId = "h1", ownerId = "u1", cardId = cardId, cutoffDate = LocalDate(2026, 10, 10),
+        amount = 300.0, paidAt = Instant.parse("2026-10-12T18:00:00Z"), method = PaymentMethod.CASH,
+    )
+
+    @Test
+    fun `carga el estado de pago de las tarjetas activas y los pagos del ciclo`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PARTIAL, paid = 300.0)
+        repo.cardPaymentList += payment("p1")
+        val s = vm().state.value
+
+        assertEquals(CardPayStatus.PARTIAL, s.statuses["activa"]!!.status)
+        assertEquals(listOf("p1"), s.payments["activa"].orEmpty().map { it.id })
+    }
+
+    @Test
+    fun `registrar un pago lo liga al ciclo, cierra el formulario y recarga`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PENDING)
+        val vm = vm()
+        vm.registerPayment(
+            vm.state.value.cards.single(), vm.state.value.statuses["activa"]!!,
+            CardPaymentDraft(amountText = "1,000", method = PaymentMethod.TRANSFER, notes = " BBVA app "),
+        )
+
+        val added = repo.addedCardPayments.single()
+        assertEquals("activa", added.cardId)
+        assertEquals("u1", added.ownerId)
+        assertEquals("h1", added.householdId)
+        assertEquals(LocalDate(2026, 10, 10), added.cutoffDate)
+        assertEquals(1000.0, added.amount, 0.0)
+        assertEquals("BBVA app", added.notes)
+        assertEquals(true, vm.state.value.paymentSaved)
+    }
+
+    @Test
+    fun `un monto invalido no llega al servidor y muestra el error`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PENDING)
+        val vm = vm()
+        vm.registerPayment(vm.state.value.cards.single(), vm.state.value.statuses["activa"]!!, CardPaymentDraft("0"))
+
+        assertEquals(emptyList<Any>(), repo.addedCardPayments)
+        assertEquals("Monto inválido", vm.state.value.paymentError)
+        assertEquals(false, vm.state.value.paymentSaved)
+    }
+
+    @Test
+    fun `no se registra un pago en una tarjeta ajena`() {
+        repo.cardList = listOf(card("ajena").copy(ownerId = "u2"))
+        repo.cycleStatuses["ajena"] = cycleStatus(CardPayStatus.PENDING)
+        val vm = vm()
+        vm.registerPayment(vm.state.value.cards.single(), vm.state.value.statuses["ajena"]!!, CardPaymentDraft("100"))
+
+        assertEquals(emptyList<Any>(), repo.addedCardPayments)
+    }
+
+    @Test
+    fun `borrar un pago lo quita y recarga`() {
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PARTIAL, paid = 300.0)
+        repo.cardPaymentList += payment("p1")
+        val vm = vm()
+        vm.deletePayment("p1")
+
+        assertEquals(listOf("p1"), repo.deletedCardPayments)
+        assertEquals(emptyList<String>(), vm.state.value.payments["activa"].orEmpty().map { it.id })
     }
 
     @Test

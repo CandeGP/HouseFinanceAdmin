@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,9 +51,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.datetime.TimeZone
+import mx.finanzas.pareja.data.CardCycleStatus
+import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.MonthSpend
+import mx.finanzas.pareja.data.PaymentMethod
 import mx.finanzas.pareja.domain.CARD_COLOR_CHOICES
 import mx.finanzas.pareja.domain.CardDraft
+import mx.finanzas.pareja.domain.CardPaymentDraft
+import mx.finanzas.pareja.domain.formatDateEs
+import mx.finanzas.pareja.domain.localDate
+import mx.finanzas.pareja.ui.components.PayStatusText
 import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardField
 import mx.finanzas.pareja.domain.cardAccentArgb
@@ -76,6 +85,17 @@ fun CardsScreen(
     var showForm by remember { mutableStateOf(openAddOnStart) }
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
+    var payFor by remember { mutableStateOf<Pair<mx.finanzas.pareja.data.Card, CardCycleStatus>?>(null) }
+    var pendingDeletePayment by remember { mutableStateOf<CardPayment?>(null) }
+    val zone = remember { TimeZone.currentSystemDefault() }
+
+    LaunchedEffect(state.paymentSaved) {
+        if (state.paymentSaved) {
+            payFor = null
+            vm.consumePaymentSaved()
+            onChanged()
+        }
+    }
 
     LaunchedEffect(state.edited) {
         if (state.edited) {
@@ -180,6 +200,27 @@ fun CardsScreen(
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                     BudgetLine(card = card, spend = spend, mine = mine)
+                                    state.statuses[card.id]?.let { status ->
+                                        PayStatusText(status, Modifier.padding(top = 6.dp))
+                                        state.payments[card.id].orEmpty().forEach { payment ->
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    "${formatDateEs(localDate(payment.paidAt, zone))} · " +
+                                                        "${if (payment.method == PaymentMethod.CASH) "Efectivo" else "Transferencia"}" +
+                                                        " · ${formatMxn(payment.amount)}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.weight(1f),
+                                                )
+                                                if (mine) {
+                                                    TextButton(onClick = { pendingDeletePayment = payment }) { Text("Borrar") }
+                                                }
+                                            }
+                                        }
+                                        if (mine) {
+                                            TextButton(onClick = { payFor = card to status }) { Text("Registrar pago") }
+                                        }
+                                    }
                                 }
                                 if (mine) {
                                     IconButton(onClick = { pendingArchive = card }) {
@@ -243,6 +284,35 @@ fun CardsScreen(
         )
     }
 
+    payFor?.let { (card, status) ->
+        CardPaymentDialog(
+            card = card,
+            status = status,
+            error = state.paymentError,
+            onDismiss = { payFor = null; vm.consumePaymentSaved() },
+            onSave = { draft -> vm.registerPayment(card, status, draft) },
+        )
+    }
+
+    pendingDeletePayment?.let { payment ->
+        AlertDialog(
+            onDismissRequest = { pendingDeletePayment = null },
+            title = { Text("¿Borrar este pago?") },
+            text = {
+                Text(
+                    "${formatMxn(payment.amount)} del ${formatDateEs(localDate(payment.paidAt, zone))}. " +
+                        "El ciclo vuelve a mostrar ese monto como pendiente.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.deletePayment(payment.id); onChanged(); pendingDeletePayment = null }) {
+                    Text("Borrar")
+                }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeletePayment = null }) { Text("Cancelar") } },
+        )
+    }
+
     pendingArchive?.let { card ->
         AlertDialog(
             onDismissRequest = { pendingArchive = null },
@@ -301,6 +371,64 @@ private fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, m
 }
 
 private fun plainNumber(value: Double): String = "%.2f".format(Locale.US, value)
+
+/** Registrar un pago a la tarjeta: monto (lo que falta, editable), forma de pago y nota. */
+@Composable
+private fun CardPaymentDialog(
+    card: mx.finanzas.pareja.data.Card,
+    status: CardCycleStatus,
+    error: String?,
+    onDismiss: () -> Unit,
+    onSave: (CardPaymentDraft) -> Unit,
+) {
+    var draft by remember(card.id, status.cutoffDate) {
+        mutableStateOf(CardPaymentDraft(amountText = if (status.remaining > 0) plainNumber(status.remaining) else ""))
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pago a ${card.name}") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Corte del ${formatDateEs(status.cutoffDate)} · límite de pago ${formatDateEs(status.dueDate)}\n" +
+                        "A pagar: ${formatMxn(status.targetAmount)}" +
+                        if (status.targetSource == "statement") " (según tu estado de cuenta)" else " (estimado de la app)",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = draft.amountText,
+                    onValueChange = { draft = draft.copy(amountText = it) },
+                    label = { Text("Monto pagado (MXN)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    isError = error != null,
+                    supportingText = error?.let { { Text(it) } },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = draft.method == PaymentMethod.TRANSFER,
+                        onClick = { draft = draft.copy(method = PaymentMethod.TRANSFER) },
+                        label = { Text("Transferencia") },
+                    )
+                    FilterChip(
+                        selected = draft.method == PaymentMethod.CASH,
+                        onClick = { draft = draft.copy(method = PaymentMethod.CASH) },
+                        label = { Text("Efectivo") },
+                    )
+                }
+                OutlinedTextField(
+                    value = draft.notes,
+                    onValueChange = { draft = draft.copy(notes = it) },
+                    label = { Text("Nota (opcional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Guardar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
 
 /** Editar todo lo de una tarjeta propia: datos, fechas, límite, presupuesto mensual y color. */
 @OptIn(ExperimentalLayoutApi::class)

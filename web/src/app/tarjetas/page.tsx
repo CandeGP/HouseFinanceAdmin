@@ -3,7 +3,7 @@
 import { useFinance } from "@/components/Shell";
 import { Bar, Card, PageTitle, Tag } from "@/components/ui";
 import { cardAccent, cardLabel } from "@/lib/cards";
-import { dayLabel, mxn } from "@/lib/format";
+import { dayLabel, mxn, payLabel } from "@/lib/format";
 
 export default function Tarjetas() {
   const { finance, uid, scope } = useFinance();
@@ -26,6 +26,18 @@ export default function Tarjetas() {
                 </div>
                 <Tag>{ownerLabel(card.owner_id)}</Tag>
               </div>
+
+              {finance.payStatus[card.id] ? (
+                <p
+                  className={
+                    finance.payStatus[card.id].status === "overdue"
+                      ? "mt-4 text-sm font-semibold text-red-600 dark:text-red-400"
+                      : "mt-4 text-sm font-semibold"
+                  }
+                >
+                  {payLabel(finance.payStatus[card.id])}
+                </p>
+              ) : null}
 
               {card.monthly_budget !== null ? (
                 <div className="mt-6">
