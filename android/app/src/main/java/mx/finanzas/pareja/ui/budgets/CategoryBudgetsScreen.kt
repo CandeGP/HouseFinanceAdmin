@@ -76,9 +76,10 @@ fun CategoryBudgetsScreen(vm: CategoryBudgetsViewModel, onBack: () -> Unit) {
             ) {
                 item {
                     Text(
-                        "Gasto de este mes: gastos confirmados (las compras a meses, por su mensualidad) y " +
-                            "pagos en efectivo con categoría. Toca una categoría para fijar su presupuesto; " +
-                            "a los dos les avisamos al llegar al 80% y al pasarse.",
+                        "Las categorías son de los dos, pero el presupuesto es solo tuyo: se compara con tu gasto " +
+                            "de este mes (tus tarjetas, las compras a meses por su mensualidad, y tus pagos en " +
+                            "efectivo con categoría). Tu pareja fija los suyos y no ve los tuyos. Toca una " +
+                            "categoría para fijar el tuyo; te avisamos al llegar al 80% y al pasarte.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -130,6 +131,14 @@ private fun BudgetRow(row: CategoryBudgetRow, onClick: () -> Unit) {
                     progress = { (row.spent / budget).toFloat().coerceIn(0f, 1f) },
                     color = color,
                     modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            // Las categorías son de los dos: si el hogar gastó más que tú, se ve cuánto entre ambos.
+            if (row.householdSpent > row.spent + 0.005) {
+                Text(
+                    "Entre los dos: ${formatMxn(row.householdSpent)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

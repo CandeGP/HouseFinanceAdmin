@@ -14,7 +14,13 @@ data class CategoryMonthSpend(val category: Category, val spend: CategorySpend)
 enum class BudgetLevel { NONE, OK, NEAR, OVER }
 
 /** Fila de la pantalla de presupuestos: gasto del mes de una categoría frente a su presupuesto. */
-data class CategoryBudgetRow(val category: Category, val spent: Double, val budget: Double?) {
+data class CategoryBudgetRow(
+    val category: Category,
+    val spent: Double,
+    val budget: Double?,
+    /** Lo que gastaron los dos en la categoría este mes (solo informativo; el avance es contra [spent]). */
+    val householdSpent: Double = spent,
+) {
     val pct: Double? get() = budget?.let { spent / it * 100 }
     val level: BudgetLevel
         get() = when {
@@ -25,11 +31,17 @@ data class CategoryBudgetRow(val category: Category, val spent: Double, val budg
         }
 }
 
-/** Primero las que tienen presupuesto (la más usada arriba), luego las demás por gasto. */
+/**
+ * Primero las que tienen presupuesto (la más usada arriba), luego las demás por gasto. Gasto y presupuesto
+ * salen de [spends], que ya son de quien consulta.
+ */
 fun categoryBudgetRows(categories: List<Category>, spends: List<CategorySpend>): List<CategoryBudgetRow> {
-    val spentById = spends.associate { it.categoryId to it.spent }
+    val spendById = spends.associateBy { it.categoryId }
     return categories
-        .map { CategoryBudgetRow(it, spentById[it.id] ?: 0.0, it.monthlyBudget) }
+        .map {
+            val spend = spendById[it.id]
+            CategoryBudgetRow(it, spend?.spent ?: 0.0, spend?.budget, spend?.householdSpent ?: 0.0)
+        }
         .sortedWith(
             compareBy<CategoryBudgetRow> { it.budget == null }
                 .thenByDescending { it.pct ?: 0.0 }

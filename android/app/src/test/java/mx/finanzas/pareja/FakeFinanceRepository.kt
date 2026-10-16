@@ -102,8 +102,11 @@ class FakeFinanceRepository : FinanceRepository {
 
     override suspend fun categories(): List<Category> = categoryList
 
-    /** Gasto del mes por id de categoría; el presupuesto sale de `categoryList`. */
+    /** Gasto del mes por id de categoría, y el presupuesto de quien consulta (individual). */
     val categorySpends: MutableMap<String, Double> = mutableMapOf()
+    val categoryBudgets: MutableMap<String, Double> = mutableMapOf()
+    /** Gasto de los dos por categoría; si no se indica, es igual al de quien consulta. */
+    val categoryHouseholdSpends: MutableMap<String, Double> = mutableMapOf()
     val budgetCalls = mutableListOf<Pair<String, Double?>>()
     var lastCategorySpendRef: LocalDate? = null
 
@@ -114,9 +117,11 @@ class FakeFinanceRepository : FinanceRepository {
         val end = LocalDate(ref.year, ref.monthNumber, 28)
         return categoryList.map {
             val spent = categorySpends[it.id] ?: 0.0
+            val budget = categoryBudgets[it.id]
             CategorySpend(
-                categoryId = it.id, monthStart = start, monthEnd = end, spent = spent, budget = it.monthlyBudget,
-                pct = it.monthlyBudget?.let { b -> spent / b * 100 },
+                categoryId = it.id, monthStart = start, monthEnd = end, spent = spent,
+                householdSpent = categoryHouseholdSpends[it.id] ?: spent, budget = budget,
+                pct = budget?.let { b -> spent / b * 100 },
             )
         }
     }
@@ -124,7 +129,7 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun setCategoryBudget(id: String, amount: Double?) {
         failIfNeeded()
         budgetCalls += id to amount
-        categoryList = categoryList.map { if (it.id == id) it.copy(monthlyBudget = amount) else it }
+        if (amount == null) categoryBudgets.remove(id) else categoryBudgets[id] = amount
     }
 
     val addedCategories = mutableListOf<String>()

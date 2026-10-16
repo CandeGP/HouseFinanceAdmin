@@ -52,11 +52,11 @@ object AlertRunner {
             .map { (cardId, status) -> status.dueAlertKey(cardId) }
             .toSet()
 
-        // Presupuestos por categoría (del hogar): solo se consulta el gasto si alguna categoría tiene uno.
-        val budgetedCategories = repo.categories().filter { it.monthlyBudget != null }
-        val categorySpends = if (budgetedCategories.isEmpty()) emptyList() else {
-            val spendById = repo.categoryMonthSpend(today).associateBy { it.categoryId }
-            budgetedCategories.mapNotNull { category -> spendById[category.id]?.let { CategoryMonthSpend(category, it) } }
+        // Presupuestos por categoría (individuales): el gasto y el presupuesto son de esta persona.
+        val budgetedSpends = repo.categoryMonthSpend(today).filter { it.budget != null }
+        val categorySpends = if (budgetedSpends.isEmpty()) emptyList() else {
+            val categoryById = repo.categories().associateBy { it.id }
+            budgetedSpends.mapNotNull { spend -> categoryById[spend.categoryId]?.let { CategoryMonthSpend(it, spend) } }
         }
 
         val pending = (upcomingAlerts(cycles, today).filter { it.daysLeft in ALERT_REMINDER_DAYS } +

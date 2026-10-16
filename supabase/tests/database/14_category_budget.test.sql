@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(16);
 
 insert into auth.users (id, email, instance_id, aud, role)
 values
@@ -34,7 +34,7 @@ select
   (select id from public.categories where name = 'Gasolina') as fuel;
 grant all on cat to authenticated;
 
--- Octubre 2026, categoría comida: 300 + 100 (1200 a 12 meses) + 50 en efectivo = 450
+-- Octubre 2026, comida de A: 300 + 100 (1200 a 12 meses) + 50 en efectivo = 450
 insert into public.transactions (household_id, owner_id, merchant, amount, occurred_at, category_id, status, source)
 values ((select hid from ctx), auth.uid(), 'Taqueria', 300, '2026-10-05', (select food from cat), 'confirmed', 'manual');
 insert into public.transactions
@@ -48,10 +48,16 @@ values
 insert into public.manual_payments (household_id, owner_id, method, amount, paid_at, concept, category_id)
 values ((select hid from ctx), auth.uid(), 'cash', 50, '2026-10-07 14:00:00-06', 'Tamales', (select food from cat));
 
--- 1) El gasto del mes suma gasto confirmado, mensualidad MSI y pago en efectivo
+-- La pareja también gasta en comida: 200 (y no debe sumarse al gasto de A)
+select pg_temp.act_as('b2b2b2b2-0000-0000-0000-000000000014');
+insert into public.transactions (household_id, owner_id, merchant, amount, occurred_at, category_id, status, source)
+values ((select hid from ctx), auth.uid(), 'Restaurante B', 200, '2026-10-09', (select food from cat), 'confirmed', 'manual');
+
+-- 1) A: su gasto del mes suma lo suyo (gasto confirmado, mensualidad MSI y efectivo), no lo de B
+select pg_temp.act_as('a1a1a1a1-0000-0000-0000-000000000014');
 select is(
   (select spent from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
-  450.00::numeric, 'suma gastos confirmados, la mensualidad MSI y los pagos en efectivo');
+  450.00::numeric, 'A ve solo su gasto: 300 + mensualidad MSI 100 + efectivo 50');
 
 -- 2) Otro mes cuenta solo lo suyo
 select is(
@@ -63,46 +69,68 @@ select is(
   (select row(spent, budget, pct)::text from public.category_month_spend('2026-10-20') where category_id = (select fuel from cat)),
   '(0.00,,)', 'sin gasto ni presupuesto: 0 y vacío');
 
--- 4) Fijar presupuesto y ver el porcentaje (A)
-update public.categories set monthly_budget = 1000 where id = (select food from cat);
+-- 4) B ve solo el suyo
+select pg_temp.act_as('b2b2b2b2-0000-0000-0000-000000000014');
+select is(
+  (select spent from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+  200.00::numeric, 'B ve solo su gasto: 200');
+
+-- 4b) Las categorías y el gasto del hogar son de los dos: B también ve lo que gastó A
+select is(
+  (select household_spent from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+  650.00::numeric, 'B ve el gasto de los dos en la categoría: 450 de A + 200 suyos');
+select pg_temp.act_as('a1a1a1a1-0000-0000-0000-000000000014');
+select is(
+  (select row(spent, household_spent)::text from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+  '(450.00,650.00)', 'A ve lo suyo y lo de los dos, sin mezclarlos');
+
+-- 5) A fija su presupuesto y ve el porcentaje
+select pg_temp.act_as('a1a1a1a1-0000-0000-0000-000000000014');
+select public.set_category_budget((select food from cat), 1000);
 select is(
   (select row(budget, pct)::text from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
-  '(1000.00,45.0)', 'el porcentaje se calcula contra el presupuesto');
+  '(1000.00,45.0)', 'A: el porcentaje se calcula contra su presupuesto');
 
--- 5) La pareja también puede cambiarlo (es del hogar)
+-- 6) B no ve el presupuesto de A; fija el suyo y es independiente
 select pg_temp.act_as('b2b2b2b2-0000-0000-0000-000000000014');
-update public.categories set monthly_budget = 600 where id = (select food from cat);
-select pg_temp.act_as_postgres();
-select is((select monthly_budget from public.categories where id = (select food from cat)), 600.00::numeric,
-  'cualquiera de los dos miembros puede fijar el presupuesto');
+select is(
+  (select budget from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+  null::numeric, 'B no hereda el presupuesto de A');
+select public.set_category_budget((select food from cat), 500);
+select is(
+  (select row(budget, pct)::text from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+  '(500.00,40.0)', 'B fija el suyo: 200 de 500');
 
--- 6) El presupuesto debe ser positivo
+-- 7) El de A sigue igual y B no puede leer la tabla de A
+select pg_temp.act_as('a1a1a1a1-0000-0000-0000-000000000014');
+select is(
+  (select budget from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+  1000.00::numeric, 'el presupuesto de A no cambió por lo de B');
+
+select pg_temp.act_as('b2b2b2b2-0000-0000-0000-000000000014');
+select is((select count(*)::int from public.category_budgets), 1, 'B solo puede leer su propio presupuesto');
+
+-- 8) El presupuesto debe ser positivo
 select pg_temp.act_as('a1a1a1a1-0000-0000-0000-000000000014');
 select throws_ok(
-  $$update public.categories set monthly_budget = 0 where id = (select food from cat)$$,
+  $$select public.set_category_budget((select food from cat), 0)$$,
   '23514', null, 'el presupuesto debe ser mayor a cero');
 
--- 7) Se puede quitar
-update public.categories set monthly_budget = null where id = (select food from cat);
-select is((select budget from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
+-- 8b) Se puede quitar (y no toca el de B)
+select public.set_category_budget((select food from cat), null);
+select is(
+  (select budget from public.category_month_spend('2026-10-20') where category_id = (select food from cat)),
   null::numeric, 'quitar el presupuesto lo deja vacío');
+select pg_temp.act_as_postgres();
+select is((select count(*)::int from public.category_budgets), 1, 'solo se borró el de A; el de B sigue');
 
--- 8) Un extraño no ve categorías ni gasto del hogar
+-- 9) Un extraño no ve categorías ni puede fijar presupuesto en un hogar ajeno
 select pg_temp.act_as('c3c3c3c3-0000-0000-0000-000000000014');
 select is((select count(*)::int from public.category_month_spend('2026-10-20')), 0,
   'un extraño no ve categorías de otro hogar');
-
--- 9) Un extraño no puede cambiar presupuestos ajenos
-update public.categories set monthly_budget = 1 where id = (select food from cat);
-select pg_temp.act_as_postgres();
-select isnt((select monthly_budget from public.categories where id = (select food from cat)), 1.00::numeric,
-  'un extraño no pudo cambiar el presupuesto');
-
--- 10) Los pagos a tarjeta y préstamos no cuentan como gasto de categoría
-select is(
-  (select sum(spent) from public.category_month_spend('2026-10-20') c
-     join public.categories k on k.id = c.category_id where k.household_id = (select hid from ctx)),
-  450.00::numeric, 'solo hay gasto de comida; nada más se cuela');
+select throws_ok(
+  $$select public.set_category_budget((select food from cat), 5)$$,
+  'P0002', null, 'un extraño no puede fijar presupuesto en un hogar ajeno');
 
 select * from finish();
 rollback;

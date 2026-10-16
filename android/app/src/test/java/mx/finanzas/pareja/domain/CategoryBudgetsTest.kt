@@ -10,13 +10,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CategoryBudgetsTest {
-    private val food = Category("cat-food", "Comida", monthlyBudget = 1000.0)
-    private val fuel = Category("cat-fuel", "Gasolina", monthlyBudget = 500.0)
+    private val food = Category("cat-food", "Comida")
+    private val fuel = Category("cat-fuel", "Gasolina")
 
-    private fun spend(id: String, spent: Double, budget: Double?, month: Int = 10) = CategorySpend(
-        categoryId = id, monthStart = LocalDate(2026, month, 1), monthEnd = LocalDate(2026, month, 28),
-        spent = spent, budget = budget, pct = budget?.let { spent / it * 100 },
-    )
+    private fun spend(id: String, spent: Double, budget: Double?, month: Int = 10, household: Double = spent) =
+        CategorySpend(
+            categoryId = id, monthStart = LocalDate(2026, month, 1), monthEnd = LocalDate(2026, month, 28),
+            spent = spent, householdSpent = household, budget = budget, pct = budget?.let { spent / it * 100 },
+        )
 
     private val plata = card("c1", name = "Plata").copy(bank = "Plata", last4 = "0931", monthlyBudget = 2000.0)
 
@@ -112,9 +113,8 @@ class CategoryBudgetsTest {
 
     @Test
     fun `el nivel de cada fila sigue las mismas reglas que los avisos`() {
-        fun level(spent: Double, budget: Double?) = categoryBudgetRows(
-            listOf(food.copy(monthlyBudget = budget)), listOf(spend("cat-food", spent, budget)),
-        ).single().level
+        fun level(spent: Double, budget: Double?) =
+            categoryBudgetRows(listOf(food), listOf(spend("cat-food", spent, budget))).single().level
 
         assertEquals(BudgetLevel.NONE, level(5000.0, null))
         assertEquals(BudgetLevel.OK, level(799.99, 1000.0))
@@ -124,10 +124,27 @@ class CategoryBudgetsTest {
     }
 
     @Test
-    fun `una categoria sin datos de gasto cuenta como cero`() {
+    fun `una categoria sin datos cuenta como cero y sin presupuesto`() {
         val row = categoryBudgetRows(listOf(food), emptyList()).single()
         assertEquals(0.0, row.spent, 0.0)
-        assertEquals(BudgetLevel.OK, row.level)
+        assertEquals(null, row.budget)
+        assertEquals(BudgetLevel.NONE, row.level)
+    }
+
+    @Test
+    fun `el gasto y el presupuesto de cada fila salen del gasto de quien consulta`() {
+        // Mi pareja gastó 4,500 en Educación: a mí me llega 0 y sin presupuesto, y a ella el suyo.
+        val education = Category("cat-edu", "Educación")
+        val mine = categoryBudgetRows(
+            listOf(education), listOf(spend("cat-edu", 0.0, null, household = 4500.0)),
+        ).single()
+        val hers = categoryBudgetRows(listOf(education), listOf(spend("cat-edu", 4500.0, 5000.0))).single()
+
+        assertEquals(0.0, mine.spent, 0.0)
+        assertEquals(BudgetLevel.NONE, mine.level)
+        assertEquals(4500.0, mine.householdSpent, 0.0) // la categoría y el gasto del hogar los ven los dos
+        assertEquals(4500.0, hers.spent, 0.0)
+        assertEquals(BudgetLevel.NEAR, hers.level)
     }
 
     @Test

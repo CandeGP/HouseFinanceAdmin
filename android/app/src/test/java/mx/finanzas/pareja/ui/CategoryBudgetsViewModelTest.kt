@@ -19,9 +19,10 @@ class CategoryBudgetsViewModelTest {
 
     private val repo = FakeFinanceRepository().apply {
         categoryList = listOf(
-            Category("cat-food", "Comida", monthlyBudget = 1000.0),
+            Category("cat-food", "Comida"),
             Category("cat-fuel", "Gasolina"),
         )
+        categoryBudgets["cat-food"] = 1000.0 // mi presupuesto (el de mi pareja es aparte)
         categorySpends["cat-food"] = 850.0
         categorySpends["cat-fuel"] = 120.0
     }

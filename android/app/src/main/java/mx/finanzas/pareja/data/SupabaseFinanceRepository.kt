@@ -111,12 +111,14 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         ).decodeList<CategorySpend>()
 
     override suspend fun setCategoryBudget(id: String, amount: Double?) {
-        // JsonNull limpia el campo: mapOf con null no se serializaría como null explícito.
-        client.postgrest.from("categories").update(
-            buildJsonObject { put("monthly_budget", amount?.let { JsonPrimitive(it) } ?: JsonNull) },
-        ) {
-            filter { eq("id", id) }
-        }
+        // Presupuesto individual: la función guarda el de quien consulta; JsonNull lo quita.
+        client.postgrest.rpc(
+            "set_category_budget",
+            buildJsonObject {
+                put("p_category", id)
+                put("p_amount", amount?.let { JsonPrimitive(it) } ?: JsonNull)
+            },
+        )
     }
 
     override suspend fun cards(): List<Card> =
