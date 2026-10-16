@@ -1,6 +1,8 @@
 package mx.finanzas.pareja.ui
 
+import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.FakeFinanceRepository
+import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.MainDispatcherRule
 import mx.finanzas.pareja.card
 import mx.finanzas.pareja.ui.cards.CardsViewModel
@@ -34,6 +36,39 @@ class CardsViewModelTest {
         val s = vm.state.value
         assertEquals(emptyList<String>(), s.cards.map { it.id })
         assertEquals(setOf("activa", "vieja"), s.archived.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `fijar un presupuesto lo guarda y trae el gasto del mes`() {
+        repo.monthSpends["activa"] = MonthSpend(
+            monthStart = LocalDate(2026, 10, 1), monthEnd = LocalDate(2026, 10, 31),
+            spent = 1700.0, budget = 2000.0, pct = 85.0,
+        )
+        val vm = vm()
+        vm.setBudget("activa", 2000.0)
+
+        assertEquals(listOf("activa" to 2000.0), repo.budgetsSet)
+        assertEquals(2000.0, vm.state.value.cards.single().monthlyBudget!!, 0.0)
+        assertEquals(1700.0, vm.state.value.spend["activa"]!!.spent, 0.0)
+    }
+
+    @Test
+    fun `quitar el presupuesto limpia el gasto mostrado`() {
+        val vm = vm()
+        vm.setBudget("activa", 1500.0)
+        vm.setBudget("activa", null)
+
+        assertEquals(null, vm.state.value.cards.single().monthlyBudget)
+        assertEquals(emptyMap<String, MonthSpend>(), vm.state.value.spend)
+    }
+
+    @Test
+    fun `un presupuesto de cero se rechaza sin llamar al servidor`() {
+        val vm = vm()
+        vm.setBudget("activa", 0.0)
+
+        assertEquals(emptyList<Pair<String, Double?>>(), repo.budgetsSet)
+        assertEquals("El presupuesto debe ser mayor a cero", vm.state.value.message)
     }
 
     @Test

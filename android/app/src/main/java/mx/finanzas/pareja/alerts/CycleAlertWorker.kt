@@ -12,16 +12,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
-import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
-import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.FinanzasApp
-import mx.finanzas.pareja.domain.ALERT_REMINDER_DAYS
-import mx.finanzas.pareja.domain.CardCycles
-import mx.finanzas.pareja.domain.reminderKey
-import mx.finanzas.pareja.domain.upcomingAlerts
 
 private const val WORK_NAME = "cycle-alerts"
 private const val NOTIFY_HOUR = 9
@@ -29,24 +20,8 @@ private const val NOTIFY_HOUR = 9
 /** Una vez al día calcula los cortes y pagos próximos de tus tarjetas y avisa lo que no se avisó. */
 class CycleAlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val app = applicationContext as FinanzasApp
-        if (!AlertPrefs.isEnabled(app)) return Result.success()
-
         return try {
-            val repo = app.repository
-            val userId = repo.currentUserId() ?: return Result.success() // sin sesión no hay nada que avisar
-            val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
-
-            val cycles = repo.cards().filter { it.ownerId == userId && !it.archived }.map { card ->
-                val current = repo.cycleEstimate(card.id, today)
-                // El pago que sigue a un corte reciente vive en el ciclo anterior.
-                val previous = current?.let { repo.cycleEstimate(card.id, it.cycleStart.minus(1, DateTimeUnit.DAY)) }
-                CardCycles(card, current, previous)
-            }
-
-            upcomingAlerts(cycles, today)
-                .filter { it.daysLeft in ALERT_REMINDER_DAYS && !AlertPrefs.wasNotified(app, it.reminderKey) }
-                .forEach { alert -> if (AlertNotifier.post(app, alert)) AlertPrefs.markNotified(app, alert.reminderKey) }
+            AlertRunner.run(applicationContext as FinanzasApp)
             Result.success()
         } catch (e: CancellationException) {
             throw e

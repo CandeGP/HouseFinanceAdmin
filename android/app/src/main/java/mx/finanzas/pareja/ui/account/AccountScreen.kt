@@ -134,7 +134,7 @@ private fun AlertsCard() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Alertas de corte y pago", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text("Alertas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Switch(
                     checked = enabled,
                     onCheckedChange = { on ->
@@ -149,7 +149,8 @@ private fun AlertsCard() {
                 )
             }
             Text(
-                "Te avisa 3 días antes, un día antes y el mismo día del corte y del pago de tus tarjetas.",
+                "Corte y pago de tus tarjetas: 3 días antes, un día antes y el mismo día. También avisa cuando " +
+                    "el gasto del mes supera el presupuesto de una tarjeta (se fija tocando la tarjeta).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import mx.finanzas.pareja.FinanzasApp
+import mx.finanzas.pareja.alerts.AlertRunner
 import mx.finanzas.pareja.data.TxSource
 import mx.finanzas.pareja.domain.ChargeSources
 import mx.finanzas.pareja.domain.RawNotification
@@ -84,6 +85,8 @@ object CaptureSync {
                 raw = charge.raw,
             )
         }
+        // Un cobro nuevo puede hacer que se supere un presupuesto: se revisa en el momento.
+        runCatching { AlertRunner.run(app) }
     }
 
     /** ¿Tiene esta app el permiso de "Acceso a notificaciones"? */

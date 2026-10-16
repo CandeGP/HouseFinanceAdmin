@@ -14,7 +14,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalContext
+import mx.finanzas.pareja.FinanzasApp
+import mx.finanzas.pareja.alerts.AlertRunner
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -88,6 +92,10 @@ fun MainScaffold(
     val route = nav.currentBackStackEntryAsState().value?.destination?.route
     // Se incrementa al guardar/borrar para que las pestañas vuelvan a cargar sus datos.
     var refreshKey by remember { mutableIntStateOf(0) }
+
+    // Al guardar, confirmar o importar gastos se revisa si se superó algún presupuesto.
+    val app = LocalContext.current.applicationContext as FinanzasApp
+    LaunchedEffect(refreshKey) { if (refreshKey > 0) runCatching { AlertRunner.run(app) } }
 
     val userId = session.userId
     val householdId = session.me.householdId

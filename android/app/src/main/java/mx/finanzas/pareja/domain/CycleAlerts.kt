@@ -5,7 +5,7 @@ import kotlinx.datetime.daysUntil
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.CycleEstimate
 
-enum class AlertKind { CUTOFF, DUE }
+enum class AlertKind { CUTOFF, DUE, BUDGET }
 
 /** Ciclo vigente y ciclo anterior de una tarjeta (el anterior puede tener un pago aún pendiente). */
 data class CardCycles(val card: Card, val current: CycleEstimate?, val previous: CycleEstimate?)

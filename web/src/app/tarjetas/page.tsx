@@ -27,6 +27,31 @@ export default function Tarjetas() {
                 <Tag>{ownerLabel(card.owner_id)}</Tag>
               </div>
 
+              {card.monthly_budget !== null ? (
+                <div className="mt-6">
+                  {(() => {
+                    const spent = finance.monthSpend[card.id]?.spent ?? 0;
+                    const over = spent > card.monthly_budget;
+                    return (
+                      <>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-semibold">Presupuesto del mes</span>
+                          <span className={over ? "font-semibold text-red-600 dark:text-red-400" : "text-muted"}>
+                            {mxn(spent)} de {mxn(card.monthly_budget)}
+                          </span>
+                        </div>
+                        <Bar pct={(spent / card.monthly_budget) * 100} />
+                        {over ? (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            Te pasaste por {mxn(spent - card.monthly_budget)}
+                          </p>
+                        ) : null}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
+
               {est ? (
                 <>
                   <div className="mt-6">

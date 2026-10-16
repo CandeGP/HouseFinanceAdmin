@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import mx.finanzas.pareja.alerts.AlertRunner
 import mx.finanzas.pareja.capture.CaptureSync
 import mx.finanzas.pareja.ui.AppRoot
 
@@ -22,5 +23,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { CaptureSync.flush(app) }
         // Avisa si hay una versión nueva (en silencio si no hay red o ya la descartaste).
         app.updates.check(manual = false)
+        // Cortes, pagos y presupuestos superados (también corre cada mañana en segundo plano).
+        lifecycleScope.launch { runCatching { AlertRunner.run(app) } }
     }
 }

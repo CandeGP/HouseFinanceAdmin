@@ -8,8 +8,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.FinanceRepository
+import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardDraft
@@ -20,6 +25,8 @@ data class CardsUiState(
     val cards: List<Card> = emptyList(),
     /** Tarjetas archivadas: ocultas del resto de la app pero con sus gastos intactos. */
     val archived: List<Card> = emptyList(),
+    /** Gasto del mes por id de tarjeta; solo para las que tienen presupuesto. */
+    val spend: Map<String, MonthSpend> = emptyMap(),
     val loading: Boolean = true,
     val errors: Map<CardField, String> = emptyMap(),
     val message: String? = null,
@@ -30,6 +37,7 @@ class CardsViewModel(
     private val repo: FinanceRepository,
     private val userId: String,
     private val householdId: String,
+    private val today: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()),
 ) : ViewModel() {
     private val _state = MutableStateFlow(CardsUiState())
     val state: StateFlow<CardsUiState> = _state.asStateFlow()
@@ -42,7 +50,10 @@ class CardsViewModel(
         viewModelScope.launch {
             try {
                 val (archived, active) = repo.cards().partition { it.archived }
-                _state.update { it.copy(cards = active, archived = archived, loading = false) }
+                val spend = active.filter { it.monthlyBudget != null }
+                    .mapNotNull { card -> repo.cardMonthSpend(card.id, today)?.let { card.id to it } }
+                    .toMap()
+                _state.update { it.copy(cards = active, archived = archived, spend = spend, loading = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -78,6 +89,24 @@ class CardsViewModel(
         viewModelScope.launch {
             try {
                 repo.archiveCard(id)
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = userMessage(e)) }
+            }
+        }
+    }
+
+    /** `amount` null quita el presupuesto. Un monto cero o negativo se rechaza antes de llegar al servidor. */
+    fun setBudget(id: String, amount: Double?) {
+        if (amount != null && amount <= 0) {
+            _state.update { it.copy(message = "El presupuesto debe ser mayor a cero") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repo.setCardBudget(id, amount)
                 load()
             } catch (e: CancellationException) {
                 throw e

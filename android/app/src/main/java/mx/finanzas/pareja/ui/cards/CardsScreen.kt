@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,9 +40,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardField
 import mx.finanzas.pareja.domain.formatMxn
+import mx.finanzas.pareja.domain.parseAmount
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 
@@ -56,6 +60,7 @@ fun CardsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(openAddOnStart) }
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
+    var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
 
     LaunchedEffect(state.added) {
         if (state.added) {
@@ -103,7 +108,8 @@ fun CardsScreen(
                     }
                     items(state.cards, key = { it.id }) { card ->
                         val mine = card.ownerId == userId
-                        Card(Modifier.fillMaxWidth()) {
+                        val spend = state.spend[card.id]
+                        Card(Modifier.fillMaxWidth().let { if (mine) it.clickable { budgetFor = card } else it }) {
                             Row(
                                 Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -128,6 +134,7 @@ fun CardsScreen(
                                             "Límite ${formatMxn(card.creditLimit)}",
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
+                                    BudgetLine(card = card, spend = spend, mine = mine)
                                 }
                                 if (mine) {
                                     IconButton(onClick = { pendingArchive = card }) {
@@ -181,6 +188,18 @@ fun CardsScreen(
         }
     }
 
+    budgetFor?.let { card ->
+        BudgetDialog(
+            card = card,
+            onDismiss = { budgetFor = null },
+            onSave = { amount ->
+                vm.setBudget(card.id, amount)
+                onChanged()
+                budgetFor = null
+            },
+        )
+    }
+
     pendingArchive?.let { card ->
         AlertDialog(
             onDismissRequest = { pendingArchive = null },
@@ -206,6 +225,83 @@ fun CardsScreen(
             onSave = vm::addCard,
         )
     }
+}
+
+/** Progreso del gasto del mes frente al presupuesto, o la invitación a fijar uno (solo tu tarjeta). */
+@Composable
+private fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, mine: Boolean) {
+    val budget = card.monthlyBudget
+    when {
+        budget == null && mine -> Text(
+            "Toca para fijar un presupuesto mensual",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        budget != null -> {
+            val spent = spend?.spent ?: 0.0
+            val over = spent > budget
+            Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Este mes: ${formatMxn(spent)} de ${formatMxn(budget)}" +
+                        (if (over) " · te pasaste por ${formatMxn(spent - budget)}" else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LinearProgressIndicator(
+                    progress = { (spent / budget).toFloat().coerceIn(0f, 1f) },
+                    color = if (over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BudgetDialog(
+    card: mx.finanzas.pareja.data.Card,
+    onDismiss: () -> Unit,
+    onSave: (Double?) -> Unit,
+) {
+    var text by remember { mutableStateOf(card.monthlyBudget?.let { "%.2f".format(it) }.orEmpty()) }
+    val amount = parseAmount(text)
+    val invalid = text.isNotBlank() && amount == null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Presupuesto mensual") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "${card.name} •••• ${card.last4}\n" +
+                        "Te avisamos a los dos cuando el gasto del mes supere este monto. Las compras a meses " +
+                        "cuentan por su mensualidad.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Monto en MXN (ej. 2000)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    isError = invalid,
+                    supportingText = if (invalid) ({ Text("Escribe un monto mayor a cero") }) else null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(amount) }, enabled = amount != null) { Text("Guardar") }
+        },
+        dismissButton = {
+            Row {
+                if (card.monthlyBudget != null) {
+                    TextButton(onClick = { onSave(null) }) { Text("Quitar") }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancelar") }
+            }
+        },
+    )
 }
 
 @Composable

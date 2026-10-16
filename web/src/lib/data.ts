@@ -10,6 +10,7 @@ export interface Card {
   bank: string;
   last4: string;
   color: string | null;
+  monthly_budget: number | null;
   credit_limit: number;
   cutoff_day: number;
   due_day: number;
@@ -43,12 +44,20 @@ export interface Estimate {
   usage_pct: number;
 }
 
+/** Gasto del mes calendario de una tarjeta frente a su presupuesto (función SQL card_month_spend). */
+export interface MonthSpend {
+  spent: number;
+  budget: number | null;
+  pct: number | null;
+}
+
 export interface Finance {
   members: Member[];
   cards: Card[];
   categories: Category[];
   txs: Tx[];
   estimates: Record<string, Estimate>;
+  monthSpend: Record<string, MonthSpend>;
 }
 
 const MONTHS_BACK = 6;
@@ -65,7 +74,7 @@ export async function loadFinance(): Promise<Finance> {
     supabase.from("members").select("user_id,display_name,household_id"),
     supabase
       .from("cards")
-      .select("id,owner_id,name,bank,last4,color,credit_limit,cutoff_day,due_day")
+      .select("id,owner_id,name,bank,last4,color,monthly_budget,credit_limit,cutoff_day,due_day")
       .eq("archived", false),
     supabase.from("categories").select("id,name"),
     supabase
@@ -91,11 +100,24 @@ export async function loadFinance(): Promise<Finance> {
     }),
   );
 
+  // Solo las tarjetas con presupuesto necesitan el gasto del mes.
+  const spendPairs = await Promise.all(
+    cardRows
+      .filter((card) => card.monthly_budget !== null)
+      .map(async (card) => {
+        const { data, error } = await supabase.rpc("card_month_spend", { p_card: card.id });
+        if (error) throw new Error(error.message);
+        const row = (data as MonthSpend[] | null)?.[0];
+        return row ? ([card.id, row] as const) : null;
+      }),
+  );
+
   return {
     members: (members.data ?? []) as Member[],
     cards: cardRows,
     categories: (categories.data ?? []) as Category[],
     txs: (txs.data ?? []) as Tx[],
     estimates: Object.fromEntries(pairs.filter((p) => p !== null)),
+    monthSpend: Object.fromEntries(spendPairs.filter((p) => p !== null)),
   };
 }

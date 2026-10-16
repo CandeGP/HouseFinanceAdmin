@@ -17,6 +17,8 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -120,6 +122,24 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
                 put("p_ref", ref.toString())
             },
         ).decodeList<CycleEstimate>().firstOrNull()
+
+    override suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend? =
+        client.postgrest.rpc(
+            "card_month_spend",
+            buildJsonObject {
+                put("p_card", cardId)
+                put("p_ref", ref.toString())
+            },
+        ).decodeList<MonthSpend>().firstOrNull()
+
+    override suspend fun setCardBudget(id: String, amount: Double?) {
+        // JsonNull limpia el campo: mapOf con null no se serializaría como null explícito.
+        client.postgrest.from("cards").update(
+            buildJsonObject { put("monthly_budget", amount?.let { JsonPrimitive(it) } ?: JsonNull) },
+        ) {
+            filter { eq("id", id) }
+        }
+    }
 
     // ---- Gastos
     override suspend fun transactions(from: LocalDate, to: LocalDate): List<Transaction> =

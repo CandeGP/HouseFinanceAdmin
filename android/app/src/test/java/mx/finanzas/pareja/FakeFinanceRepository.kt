@@ -12,6 +12,7 @@ import mx.finanzas.pareja.data.CycleEstimate
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.Member
 import mx.finanzas.pareja.data.MemberRole
+import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.NewTransaction
 import mx.finanzas.pareja.data.ImportInstallment
@@ -41,6 +42,8 @@ class FakeFinanceRepository : FinanceRepository {
     val addedCards = mutableListOf<NewCard>()
     val archivedCards = mutableListOf<String>()
     val restoredCards = mutableListOf<String>()
+    val monthSpends: MutableMap<String, MonthSpend> = mutableMapOf()
+    val budgetsSet = mutableListOf<Pair<String, Double?>>()
     var lastRange: Pair<LocalDate, LocalDate>? = null
 
     private fun failIfNeeded() {
@@ -100,6 +103,13 @@ class FakeFinanceRepository : FinanceRepository {
     }
 
     override suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate? = estimates[cardId]
+
+    override suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend? = monthSpends[cardId]
+
+    override suspend fun setCardBudget(id: String, amount: Double?) {
+        budgetsSet += id to amount
+        cardList = cardList.map { if (it.id == id) it.copy(monthlyBudget = amount) else it }
+    }
 
     override suspend fun transactions(from: LocalDate, to: LocalDate): List<Transaction> {
         lastRange = from to to

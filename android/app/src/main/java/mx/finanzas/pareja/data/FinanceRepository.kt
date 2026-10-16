@@ -44,6 +44,12 @@ interface FinanceRepository {
     suspend fun restoreCard(id: String)
     suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate?
 
+    /** Gasto del mes calendario de [ref] frente al presupuesto de la tarjeta. */
+    suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend?
+
+    /** Fija el presupuesto mensual de una tarjeta propia; null lo quita. */
+    suspend fun setCardBudget(id: String, amount: Double?)
+
     // Gastos
     suspend fun transactions(from: LocalDate, to: LocalDate): List<Transaction>
     suspend fun transaction(id: String): Transaction?

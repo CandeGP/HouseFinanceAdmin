@@ -61,6 +61,18 @@ data class Card(
     val archived: Boolean = false,
     /** Otros últimos 4 con los que aparece la tarjeta (digital, virtual o Google Wallet). */
     @SerialName("alt_last4") val altLast4: List<String> = emptyList(),
+    /** Tope de gasto por mes calendario; null si no tiene presupuesto. */
+    @SerialName("monthly_budget") val monthlyBudget: Double? = null,
+)
+
+/** Resultado de la RPC `card_month_spend`: gasto del mes de una tarjeta frente a su presupuesto. */
+@Serializable
+data class MonthSpend(
+    @SerialName("month_start") val monthStart: LocalDate,
+    @SerialName("month_end") val monthEnd: LocalDate,
+    val spent: Double,
+    val budget: Double? = null,
+    val pct: Double? = null,
 )
 
 @Serializable
