@@ -7,6 +7,7 @@ import mx.finanzas.pareja.card
 import mx.finanzas.pareja.cycleStatus
 import mx.finanzas.pareja.data.CardPayStatus
 import mx.finanzas.pareja.estimate
+import mx.finanzas.pareja.tx
 import mx.finanzas.pareja.ui.dashboard.DashboardViewModel
 import mx.finanzas.pareja.ui.dashboard.Scope
 import org.junit.Assert.assertEquals
@@ -48,6 +49,27 @@ class DashboardViewModelTest {
         assertEquals(CardPayStatus.PAID, s.statuses["mine-a"]!!.status)
         assertEquals(CardPayStatus.PENDING, s.statuses["partner"]!!.status)
         assertEquals(null, s.statuses["mine-b"])
+    }
+
+    private fun monthlyCharge(merchant: String, amount: Double, owner: String) =
+        listOf(7, 8, 9, 10).map { month ->
+            tx("$merchant-$month", amount, date = LocalDate(2026, month, 12), ownerId = owner).copy(merchant = merchant)
+        }
+
+    @Test
+    fun `detecta los cargos recurrentes y respeta el alcance Mios y Ambos`() {
+        repo.txList = (monthlyCharge("Netflix", 219.0, "u1") + monthlyCharge("Telcel", 399.0, "u2")).toMutableList()
+        val vm = vm()
+
+        assertEquals(listOf("Netflix", "Telcel"), vm.state.value.recurring.map { it.merchant }.sorted())
+
+        vm.setScope(Scope.MINE)
+        assertEquals(listOf("Netflix"), vm.state.value.recurring.map { it.merchant })
+    }
+
+    @Test
+    fun `sin historial no hay cargos recurrentes`() {
+        assertEquals(emptyList<Any>(), vm().state.value.recurring)
     }
 
     @Test

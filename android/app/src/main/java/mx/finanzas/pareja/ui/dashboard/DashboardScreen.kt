@@ -23,7 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.domain.CardRank
+import mx.finanzas.pareja.domain.RecurringCharge
 import mx.finanzas.pareja.domain.formatDateEs
+import mx.finanzas.pareja.domain.formatDayMonthEs
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.ui.components.CardChip
 import mx.finanzas.pareja.ui.components.EmptyState
@@ -84,6 +86,7 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item { TotalsCard(state.summary.totalCycle, state.summary.totalMsiRemaining, state.summary.topCard?.name) }
+                if (state.recurring.isNotEmpty()) item { RecurringCard(state.recurring) }
                 items(state.summary.ranking, key = { it.view.card.id }) { rank ->
                     CardRankItem(
                         rank,
@@ -111,6 +114,47 @@ private fun TotalsCard(totalCycle: Double, msiRemaining: Double, topCardName: St
             if (topCardName != null) {
                 Text("Tarjeta con más gasto: $topCardName", style = MaterialTheme.typography.bodyMedium)
             }
+        }
+    }
+}
+
+private const val MAX_RECURRING_SHOWN = 5
+
+/** Cargos que se repiten cada mes y se esperan pronto, con lo que suman. */
+@Composable
+private fun RecurringCard(charges: List<RecurringCharge>) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Próximos cargos (estimado)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${formatMxn(charges.sumOf { it.amount })} comprometidos",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            charges.take(MAX_RECURRING_SHOWN).forEach { charge ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        charge.merchant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "~${formatDayMonthEs(charge.nextExpected)} · ${formatMxn(charge.amount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            if (charges.size > MAX_RECURRING_SHOWN) {
+                Text(
+                    "y ${charges.size - MAX_RECURRING_SHOWN} más",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                "Cargos que se repiten cada mes en tus últimos gastos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

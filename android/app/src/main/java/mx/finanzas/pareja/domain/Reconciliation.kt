@@ -31,7 +31,7 @@ private const val AMOUNT_EPSILON = 0.005
 // Abreviaturas que usan los estados de cuenta para el mismo comercio que muestran las notificaciones.
 private val ALIASES = listOf("merpago" to "mercadopago", "mpago" to "mercadopago")
 
-private fun merchantKey(raw: String): String {
+internal fun merchantKey(raw: String): String {
     val noAccents = Normalizer.normalize(raw, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
     var key = noAccents.lowercase().replace(Regex("[^a-z0-9]"), "")
     for ((short, long) in ALIASES) key = key.replace(short, long)
