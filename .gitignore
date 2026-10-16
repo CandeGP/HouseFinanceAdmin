@@ -7,3 +7,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Volcados de error de la terminal (Git Bash)
+*.stackdump
