@@ -44,6 +44,18 @@ data class Category(
     val id: String,
     val name: String,
     val icon: String? = null,
+    @SerialName("monthly_budget") val monthlyBudget: Double? = null,
+)
+
+/** Gasto del mes calendario de una categoría frente a su presupuesto (RPC `category_month_spend`). */
+@Serializable
+data class CategorySpend(
+    @SerialName("category_id") val categoryId: String,
+    @SerialName("month_start") val monthStart: LocalDate,
+    @SerialName("month_end") val monthEnd: LocalDate,
+    val spent: Double,
+    val budget: Double? = null,
+    val pct: Double? = null,
 )
 
 @Serializable

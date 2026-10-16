@@ -11,6 +11,7 @@ import mx.finanzas.pareja.data.CardPatch
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.Category
+import mx.finanzas.pareja.data.CategorySpend
 import mx.finanzas.pareja.data.CycleEstimate
 import mx.finanzas.pareja.data.Loan
 import mx.finanzas.pareja.data.LoanRepayment
@@ -98,6 +99,31 @@ class FakeFinanceRepository : FinanceRepository {
     }
 
     override suspend fun categories(): List<Category> = categoryList
+
+    /** Gasto del mes por id de categoría; el presupuesto sale de `categoryList`. */
+    val categorySpends: MutableMap<String, Double> = mutableMapOf()
+    val budgetCalls = mutableListOf<Pair<String, Double?>>()
+    var lastCategorySpendRef: LocalDate? = null
+
+    override suspend fun categoryMonthSpend(ref: LocalDate): List<CategorySpend> {
+        failIfNeeded()
+        lastCategorySpendRef = ref
+        val start = LocalDate(ref.year, ref.monthNumber, 1)
+        val end = LocalDate(ref.year, ref.monthNumber, 28)
+        return categoryList.map {
+            val spent = categorySpends[it.id] ?: 0.0
+            CategorySpend(
+                categoryId = it.id, monthStart = start, monthEnd = end, spent = spent, budget = it.monthlyBudget,
+                pct = it.monthlyBudget?.let { b -> spent / b * 100 },
+            )
+        }
+    }
+
+    override suspend fun setCategoryBudget(id: String, amount: Double?) {
+        failIfNeeded()
+        budgetCalls += id to amount
+        categoryList = categoryList.map { if (it.id == id) it.copy(monthlyBudget = amount) else it }
+    }
 
     val addedCategories = mutableListOf<String>()
 

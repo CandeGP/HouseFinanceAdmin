@@ -54,6 +54,12 @@ interface FinanceRepository {
 
     /** Crea una categoría del hogar; los miembros pueden agregar las suyas. */
     suspend fun addCategory(householdId: String, name: String)
+
+    /** Gasto del mes calendario de [ref] por categoría (todas las del hogar, con o sin presupuesto). */
+    suspend fun categoryMonthSpend(ref: LocalDate): List<CategorySpend>
+
+    /** Fija el presupuesto mensual de una categoría del hogar; null lo quita. */
+    suspend fun setCategoryBudget(id: String, amount: Double?)
     suspend fun cards(): List<Card>
     suspend fun addCard(card: NewCard)
     suspend fun updateCard(id: String, patch: CardPatch)

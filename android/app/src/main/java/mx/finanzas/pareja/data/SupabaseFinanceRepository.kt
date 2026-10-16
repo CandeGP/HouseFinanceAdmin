@@ -104,6 +104,21 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         client.postgrest.from("categories").insert(NewCategory(householdId, name))
     }
 
+    override suspend fun categoryMonthSpend(ref: LocalDate): List<CategorySpend> =
+        client.postgrest.rpc(
+            "category_month_spend",
+            buildJsonObject { put("p_ref", ref.toString()) },
+        ).decodeList<CategorySpend>()
+
+    override suspend fun setCategoryBudget(id: String, amount: Double?) {
+        // JsonNull limpia el campo: mapOf con null no se serializaría como null explícito.
+        client.postgrest.from("categories").update(
+            buildJsonObject { put("monthly_budget", amount?.let { JsonPrimitive(it) } ?: JsonNull) },
+        ) {
+            filter { eq("id", id) }
+        }
+    }
+
     override suspend fun cards(): List<Card> =
         client.postgrest.from("cards").select {
             order("name", Order.ASCENDING)

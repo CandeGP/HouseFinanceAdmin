@@ -53,6 +53,8 @@ import mx.finanzas.pareja.ui.payments.PaymentFormScreen
 import mx.finanzas.pareja.ui.payments.PaymentsScreen
 import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.statements.StatementImportScreen
+import mx.finanzas.pareja.ui.budgets.CategoryBudgetsScreen
+import mx.finanzas.pareja.ui.budgets.CategoryBudgetsViewModel
 import mx.finanzas.pareja.ui.loans.LoansScreen
 import mx.finanzas.pareja.ui.loans.LoansViewModel
 import mx.finanzas.pareja.ui.statements.StatementImportViewModel
@@ -70,6 +72,7 @@ private const val ROUTE_CARDS = "cards"
 private const val ROUTE_ACCOUNT = "account"
 private const val ROUTE_PAYMENTS = "payments"
 private const val ROUTE_LOANS = "loans"
+private const val ROUTE_CATEGORY_BUDGETS = "category_budgets"
 private const val ROUTE_INBOX = "inbox"
 private const val ROUTE_STATEMENT_IMPORT = "statement_import"
 private const val ROUTE_FORM = "tx_form?id={id}"
@@ -247,7 +250,18 @@ fun MainScaffold(
                 val vm: AccountViewModel = viewModel(
                     factory = viewModelFactory { AccountViewModel(repo, householdId) },
                 )
-                AccountScreen(vm = vm, session = session, onSignOut = onSignOut)
+                AccountScreen(
+                    vm = vm,
+                    session = session,
+                    onSignOut = onSignOut,
+                    onOpenBudgets = { nav.navigate(ROUTE_CATEGORY_BUDGETS) },
+                )
+            }
+            composable(ROUTE_CATEGORY_BUDGETS) {
+                val vm: CategoryBudgetsViewModel = viewModel(
+                    factory = viewModelFactory { CategoryBudgetsViewModel(repo, today()) },
+                )
+                CategoryBudgetsScreen(vm = vm, onBack = { nav.popBackStack() })
             }
             composable(
                 route = ROUTE_FORM,

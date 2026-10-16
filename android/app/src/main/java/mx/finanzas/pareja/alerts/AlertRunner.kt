@@ -12,7 +12,10 @@ import mx.finanzas.pareja.data.cycleStatuses
 import mx.finanzas.pareja.domain.ALERT_REMINDER_DAYS
 import mx.finanzas.pareja.domain.CardCycles
 import mx.finanzas.pareja.domain.CardMonthSpend
+import mx.finanzas.pareja.domain.CategoryMonthSpend
 import mx.finanzas.pareja.domain.budgetAlerts
+import mx.finanzas.pareja.domain.budgetWarnings
+import mx.finanzas.pareja.domain.categoryBudgetAlerts
 import mx.finanzas.pareja.domain.dueAlertKey
 import mx.finanzas.pareja.domain.isSettled
 import mx.finanzas.pareja.domain.reminderKey
@@ -49,8 +52,16 @@ object AlertRunner {
             .map { (cardId, status) -> status.dueAlertKey(cardId) }
             .toSet()
 
+        // Presupuestos por categoría (del hogar): solo se consulta el gasto si alguna categoría tiene uno.
+        val budgetedCategories = repo.categories().filter { it.monthlyBudget != null }
+        val categorySpends = if (budgetedCategories.isEmpty()) emptyList() else {
+            val spendById = repo.categoryMonthSpend(today).associateBy { it.categoryId }
+            budgetedCategories.mapNotNull { category -> spendById[category.id]?.let { CategoryMonthSpend(category, it) } }
+        }
+
         val pending = (upcomingAlerts(cycles, today).filter { it.daysLeft in ALERT_REMINDER_DAYS } +
-            budgetAlerts(budgets)).filterNot { it.key in settled }
+            budgetAlerts(budgets) + budgetWarnings(budgets) + categoryBudgetAlerts(categorySpends))
+            .filterNot { it.key in settled }
 
         pending
             .filterNot { AlertPrefs.wasNotified(app, it.reminderKey) }
