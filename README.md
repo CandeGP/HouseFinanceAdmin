@@ -43,6 +43,9 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 - **Pagos en efectivo o transferencia** con evidencia (foto/PDF) en un bucket privado.
 - **Alertas de corte y pago**: avisos 3 días antes, 1 día antes y el mismo día (WorkManager).
 - **Dashboard web** de solo lectura con edición de monto y categoría, mismo login que la app.
+- **Actualizaciones dentro de la app**: al abrirla avisa si hay versión nueva (`latest.json` en el bucket
+  público), la descarga, verifica su SHA-256 y abre el instalador de Android. También en Cuenta →
+  "Buscar actualizaciones".
 
 ## Arquitectura
 
@@ -88,6 +91,16 @@ cd android && ./gradlew testDebugUnitTest installDebug
 
 Una copia de demostración (otro paquete, no toca tu sesión):
 `./gradlew assembleDebug -Pdemo -Psupabase.url=... -Psupabase.key=...`
+
+### Publicar una versión nueva de la app
+
+```bash
+cd android && ./gradlew assembleRelease     # sube versionCode/versionName en app/build.gradle.kts antes
+cd .. && ./scripts/publish-android.ps1 -Notes "Qué cambió"
+```
+
+El script sube el APK firmado y `latest.json` al bucket `releases`, verifica el hash descargado y la
+página `/descargar` toma la versión sola. La llave de firma NO está en el repo (`android/keystore.properties`).
 
 ### Producción en Supabase Cloud
 

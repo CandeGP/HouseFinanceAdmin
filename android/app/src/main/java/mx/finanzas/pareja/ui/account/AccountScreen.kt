@@ -39,8 +39,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import mx.finanzas.pareja.BuildConfig
 import mx.finanzas.pareja.FinanzasApp
 import mx.finanzas.pareja.capture.CaptureSync
+import mx.finanzas.pareja.update.UpdateState
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -76,6 +78,33 @@ private fun CaptureCard() {
                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 }) { Text("Activar acceso a notificaciones") }
             }
+        }
+    }
+}
+
+/** Versión instalada y búsqueda manual de actualizaciones (el aviso automático sale al abrir la app). */
+@Composable
+private fun VersionCard() {
+    val controller = (LocalContext.current.applicationContext as FinanzasApp).updates
+    val state by controller.state.collectAsStateWithLifecycle()
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Versión ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
+            Text(
+                when (val s = state) {
+                    UpdateState.Checking -> "Buscando actualizaciones…"
+                    UpdateState.UpToDate -> "Estás al día."
+                    is UpdateState.Available -> "Hay una versión nueva: ${s.manifest.versionName}."
+                    else -> "Las actualizaciones se descargan aquí mismo; Android te pide confirmar la instalación."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = { controller.check(manual = true) },
+                enabled = state != UpdateState.Checking,
+            ) { Text("Buscar actualizaciones") }
         }
     }
 }
@@ -249,6 +278,7 @@ fun AccountScreen(
         AlertsCard()
         CaptureCard()
         UnparsedCard()
+        VersionCard()
 
         OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Cerrar sesión") }
     }

@@ -2,4 +2,6 @@
 <paths>
     <!-- Fotos del comprobante tomadas con la cámara (temporales) -->
     <cache-path name="evidence" path="evidence/" />
+    <!-- APK de la actualización descargada, para entregarlo al instalador del sistema -->
+    <cache-path name="updates" path="updates/" />
 </paths>

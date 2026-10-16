@@ -2,12 +2,39 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Descargar la app · Finanzas en pareja" };
 
-// Datos del APK publicado. Cámbialos al subir una versión nueva.
-const VERSION = "1.0.2";
-const SIZE = "21.7 MB";
-const SHA256 = "cd772ca6b40b8478dc905ed11a32eb3f3b35ac0760ab3864b3d76fd76996f7b7";
+const releasesBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/releases`;
+const apkUrl = `${releasesBase}/finanzas.apk`;
 
-const apkUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/releases/finanzas.apk`;
+interface Release {
+  versionName: string;
+  sha256: string;
+  sizeBytes: number | null;
+  notes: string | null;
+}
+
+// Respaldo por si el manifiesto no responde; el dato vigente sale de latest.json (lo publica el script).
+const FALLBACK: Release = {
+  versionName: "1.0.2",
+  sha256: "cd772ca6b40b8478dc905ed11a32eb3f3b35ac0760ab3864b3d76fd76996f7b7",
+  sizeBytes: null,
+  notes: null,
+};
+
+async function loadRelease(): Promise<Release> {
+  try {
+    const res = await fetch(`${releasesBase}/latest.json`, { next: { revalidate: 60 } });
+    if (!res.ok) return FALLBACK;
+    const data = await res.json();
+    return {
+      versionName: String(data.versionName),
+      sha256: String(data.sha256),
+      sizeBytes: typeof data.sizeBytes === "number" ? data.sizeBytes : null,
+      notes: data.notes ? String(data.notes) : null,
+    };
+  } catch {
+    return FALLBACK;
+  }
+}
 
 const STEPS = [
   "Toca el botón y descarga el archivo en tu teléfono Android.",
@@ -15,7 +42,10 @@ const STEPS = [
   "Abre Finanzas, inicia sesión con tu cuenta y activa las alertas y el acceso a notificaciones en Cuenta.",
 ];
 
-export default function Descargar() {
+export default async function Descargar() {
+  const release = await loadRelease();
+  const size = release.sizeBytes ? `${(release.sizeBytes / 1024 / 1024).toFixed(1)} MB` : null;
+
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-8 px-6 py-16">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -26,8 +56,10 @@ export default function Descargar() {
           Finanzas en pareja para Android
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Tus tarjetas, cortes y pagos en un solo lugar. Versión {VERSION} · {SIZE}.
+          Tus tarjetas, cortes y pagos en un solo lugar. Versión {release.versionName}
+          {size ? ` · ${size}` : ""}.
         </p>
+        {release.notes ? <p className="mt-2 text-sm text-muted">{release.notes}</p> : null}
       </header>
 
       <a
@@ -49,7 +81,7 @@ export default function Descargar() {
       </ol>
 
       <p className="break-all text-xs text-smoke">
-        SHA-256 del archivo: <code>{SHA256}</code>
+        SHA-256 del archivo: <code>{release.sha256}</code>
       </p>
     </main>
   );

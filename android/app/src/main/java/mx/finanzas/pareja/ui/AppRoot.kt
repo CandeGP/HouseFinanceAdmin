@@ -15,6 +15,7 @@ import mx.finanzas.pareja.ui.auth.AuthScreen
 import mx.finanzas.pareja.ui.auth.OnboardingScreen
 import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.session.SessionViewModel
+import mx.finanzas.pareja.ui.update.UpdatePrompt
 
 @Composable
 fun AppRoot(repo: FinanceRepository) {
@@ -40,6 +41,7 @@ fun AppRoot(repo: FinanceRepository) {
                     )
                 is SessionState.Ready -> MainScaffold(repo = repo, session = s, onSignOut = vm::signOut)
             }
+            UpdatePrompt()
         }
     }
 }

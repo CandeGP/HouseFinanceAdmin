@@ -7,6 +7,7 @@ import mx.finanzas.pareja.capture.UnparsedLogStore
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.SupabaseFinanceRepository
 import mx.finanzas.pareja.data.createSupabase
+import mx.finanzas.pareja.update.UpdateController
 
 class FinanzasApp : Application() {
     override fun onCreate() {
@@ -21,4 +22,6 @@ class FinanzasApp : Application() {
     val captureStore: PendingCaptureStore by lazy { PendingCaptureStore(this) }
 
     val unparsedLog: UnparsedLogStore by lazy { UnparsedLogStore(this) }
+
+    val updates: UpdateController by lazy { UpdateController(this) }
 }

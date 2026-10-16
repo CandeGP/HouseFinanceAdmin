@@ -20,5 +20,7 @@ class MainActivity : ComponentActivity() {
         // Reintenta enviar cobros capturados que no pudieron subirse (p. ej. sin red).
         val app = application as FinanzasApp
         lifecycleScope.launch { CaptureSync.flush(app) }
+        // Avisa si hay una versión nueva (en silencio si no hay red o ya la descartaste).
+        app.updates.check(manual = false)
     }
 }
