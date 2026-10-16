@@ -1,15 +1,16 @@
 package mx.finanzas.pareja
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import mx.finanzas.pareja.alerts.AlertRunner
 import mx.finanzas.pareja.capture.CaptureSync
 import mx.finanzas.pareja.ui.AppRoot
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity (y no solo ComponentActivity): el aviso de huella/PIN del sistema lo exige.
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as FinanzasApp

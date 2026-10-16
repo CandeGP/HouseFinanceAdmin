@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.ui.auth.AuthScreen
 import mx.finanzas.pareja.ui.auth.OnboardingScreen
+import mx.finanzas.pareja.ui.lock.LockGate
 import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.session.SessionViewModel
 import mx.finanzas.pareja.ui.update.UpdatePrompt
@@ -50,23 +51,26 @@ fun AppRoot(repo: FinanceRepository) {
             val message by vm.message.collectAsStateWithLifecycle()
             val busy by vm.busy.collectAsStateWithLifecycle()
 
-            when (val s = state) {
-                SessionState.Loading ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                SessionState.Offline -> OfflineScreen(busy = busy, onRetry = vm::refresh)
-                SessionState.SignedOut ->
-                    AuthScreen(busy = busy, message = message, onSignIn = vm::signIn, onSignUp = vm::signUp)
-                is SessionState.NeedsHousehold ->
-                    OnboardingScreen(
-                        busy = busy,
-                        message = message,
-                        onCreate = vm::createHousehold,
-                        onJoin = vm::acceptInvite,
-                        onSignOut = vm::signOut,
-                    )
-                is SessionState.Ready -> MainScaffold(repo = repo, session = s, onSignOut = vm::signOut)
+            // Con el bloqueo activado, nada de esto se dibuja hasta desbloquear con huella o PIN.
+            LockGate {
+                when (val s = state) {
+                    SessionState.Loading ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    SessionState.Offline -> OfflineScreen(busy = busy, onRetry = vm::refresh)
+                    SessionState.SignedOut ->
+                        AuthScreen(busy = busy, message = message, onSignIn = vm::signIn, onSignUp = vm::signUp)
+                    is SessionState.NeedsHousehold ->
+                        OnboardingScreen(
+                            busy = busy,
+                            message = message,
+                            onCreate = vm::createHousehold,
+                            onJoin = vm::acceptInvite,
+                            onSignOut = vm::signOut,
+                        )
+                    is SessionState.Ready -> MainScaffold(repo = repo, session = s, onSignOut = vm::signOut)
+                }
+                UpdatePrompt()
             }
-            UpdatePrompt()
         }
     }
 }

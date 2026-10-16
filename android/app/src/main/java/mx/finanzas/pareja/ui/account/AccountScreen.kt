@@ -48,6 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.MemberRole
 import mx.finanzas.pareja.ui.components.ErrorText
+import mx.finanzas.pareja.ui.lock.AppAuth
+import mx.finanzas.pareja.ui.lock.LockPrefs
+import mx.finanzas.pareja.ui.lock.findFragmentActivity
 import mx.finanzas.pareja.ui.session.SessionState
 
 /** Estado y activación del permiso de acceso a notificaciones (captura automática de cobros). */
@@ -110,6 +113,57 @@ private fun VersionCard() {
 }
 
 /** Activa o desactiva los avisos de corte y de pago de tus tarjetas. */
+/** Interruptor del bloqueo con huella o PIN: activarlo o apagarlo pide autenticarse primero. */
+@Composable
+private fun LockCard() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(LockPrefs.isEnabled(context)) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val available = remember { AppAuth.isAvailable(context) }
+
+    fun change(want: Boolean) {
+        if (want && !available) {
+            message = "Primero configura una huella o un PIN en los ajustes del teléfono."
+            return
+        }
+        val activity = context.findFragmentActivity() ?: return
+        AppAuth.authenticate(
+            activity = activity,
+            title = if (want) "Activar el bloqueo" else "Apagar el bloqueo",
+            subtitle = "Confirma que eres tú",
+            onSuccess = { LockPrefs.setEnabled(context, want); enabled = want; message = null },
+            onError = { message = it },
+        )
+    }
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Bloqueo de la app", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = enabled, onCheckedChange = { change(it) })
+            }
+            Text(
+                "Pide tu huella o el PIN del teléfono al abrir la app y al volver después de 30 segundos. " +
+                    "Los avisos y la captura de cobros siguen funcionando con la app bloqueada.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (enabled && !available) {
+                Text(
+                    "Este teléfono ya no tiene huella ni PIN configurados: la app no se bloqueará hasta que los configures.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            ErrorText(message)
+        }
+    }
+}
+
 @Composable
 private fun AlertsCard() {
     val context = LocalContext.current
@@ -281,6 +335,7 @@ fun AccountScreen(
         OutlinedButton(onClick = onOpenBudgets, modifier = Modifier.fillMaxWidth()) {
             Text("Presupuestos por categoría")
         }
+        LockCard()
         AlertsCard()
         CaptureCard()
         UnparsedCard()

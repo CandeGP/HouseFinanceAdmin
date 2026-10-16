@@ -27,8 +27,8 @@ android {
         if (project.hasProperty("demo")) applicationIdSuffix = ".demo"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.7.0"
+        versionCode = 16
+        versionName = "1.8.0"
 
         buildConfigField("String", "SUPABASE_URL", "\"${prop("supabase.url", "http://10.0.2.2:54321")}\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${prop("supabase.key", "")}\"")
@@ -96,6 +96,8 @@ dependencies {
     implementation(libs.pdfbox.android)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
