@@ -249,6 +249,63 @@ data class CardPayment(
     val notes: String? = null,
 )
 
+/** Quién prestó a quién: lent = yo presté · borrowed = me prestaron. */
+@Serializable
+enum class LoanDirection {
+    @SerialName("lent") LENT,
+    @SerialName("borrowed") BORROWED,
+}
+
+/** Préstamo entre personas; va aparte de los gastos. `forgivenAt` != null lo saca de lo que se debe. */
+@Serializable
+data class Loan(
+    val id: String,
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    val person: String,
+    val direction: LoanDirection,
+    val amount: Double,
+    @SerialName("occurred_on") val occurredOn: LocalDate,
+    val method: PaymentMethod,
+    val note: String? = null,
+    @SerialName("forgiven_at") val forgivenAt: Instant? = null,
+)
+
+@Serializable
+data class NewLoan(
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    val person: String,
+    val direction: LoanDirection,
+    val amount: Double,
+    @SerialName("occurred_on") val occurredOn: LocalDate,
+    val method: PaymentMethod,
+    val note: String? = null,
+)
+
+@Serializable
+data class LoanRepayment(
+    val id: String,
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("loan_id") val loanId: String,
+    val amount: Double,
+    @SerialName("paid_on") val paidOn: LocalDate,
+    val method: PaymentMethod,
+    val note: String? = null,
+)
+
+@Serializable
+data class NewLoanRepayment(
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("loan_id") val loanId: String,
+    val amount: Double,
+    @SerialName("paid_on") val paidOn: LocalDate,
+    val method: PaymentMethod,
+    val note: String? = null,
+)
+
 @Serializable
 data class NewCardPayment(
     @SerialName("household_id") val householdId: String,

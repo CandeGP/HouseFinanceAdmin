@@ -288,7 +288,14 @@ fun PaymentFormScreen(
 /** Campo "Pagado a": se puede escribir un nombre nuevo o elegir uno de los ya usados, para no teclearlo igual cada vez. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PayeeField(value: String, payees: List<String>, enabled: Boolean, onChange: (String) -> Unit) {
+internal fun PayeeField(
+    value: String,
+    payees: List<String>,
+    enabled: Boolean,
+    onChange: (String) -> Unit,
+    label: String = "Pagado a (opcional)",
+    error: String? = null,
+) {
     var expanded by remember { mutableStateOf(false) }
     val matches = matchingPayees(payees, value)
     val open = expanded && enabled && matches.isNotEmpty()
@@ -296,7 +303,9 @@ private fun PayeeField(value: String, payees: List<String>, enabled: Boolean, on
         OutlinedTextField(
             value = value,
             onValueChange = { onChange(it); expanded = true },
-            label = { Text("Pagado a (opcional)") },
+            label = { Text(label) },
+            isError = error != null,
+            supportingText = error?.let { { Text(it) } },
             singleLine = true,
             enabled = enabled,
             trailingIcon = { if (payees.isNotEmpty()) ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },

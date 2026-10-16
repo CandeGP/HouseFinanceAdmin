@@ -22,6 +22,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +57,7 @@ fun PaymentsScreen(
     refreshKey: Int,
     onNew: () -> Unit,
     onEdit: (String) -> Unit,
+    onOpenLoans: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(refreshKey) { if (refreshKey > 0) vm.load() }
@@ -92,6 +94,9 @@ fun PaymentsScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
+            OutlinedButton(onClick = onOpenLoans, modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text("Préstamos entre personas")
+            }
             if (withoutProof > 0) {
                 Text(
                     "$withoutProof sin comprobante",

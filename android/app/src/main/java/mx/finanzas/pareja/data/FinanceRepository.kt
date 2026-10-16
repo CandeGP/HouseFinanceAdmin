@@ -119,6 +119,17 @@ interface FinanceRepository {
     suspend fun updateManualPayment(id: String, patch: ManualPaymentPatch)
     suspend fun deleteManualPayment(id: String)
 
+    // Préstamos entre personas (aparte de los gastos)
+    suspend fun loans(): List<Loan>
+    suspend fun loanRepayments(): List<LoanRepayment>
+    suspend fun addLoan(loan: NewLoan)
+    suspend fun deleteLoan(id: String)
+
+    /** Perdonar saca el préstamo de lo que se debe; reabrirlo lo devuelve. */
+    suspend fun setLoanForgiven(id: String, forgiven: Boolean)
+    suspend fun addLoanRepayment(repayment: NewLoanRepayment)
+    suspend fun deleteLoanRepayment(id: String)
+
     // Evidencias (bucket privado `evidence`)
     suspend fun uploadEvidence(path: String, bytes: ByteArray, mimeType: String)
     suspend fun deleteEvidence(path: String)

@@ -12,6 +12,10 @@ import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayment
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.CycleEstimate
+import mx.finanzas.pareja.data.Loan
+import mx.finanzas.pareja.data.LoanRepayment
+import mx.finanzas.pareja.data.NewLoan
+import mx.finanzas.pareja.data.NewLoanRepayment
 import mx.finanzas.pareja.data.NewCardPayment
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.Member
@@ -264,6 +268,47 @@ class FakeFinanceRepository : FinanceRepository {
     override suspend fun deleteManualPayment(id: String) {
         deletedPayments += id
         paymentList.removeAll { it.id == id }
+    }
+
+    // ---- Préstamos
+    var loanList: MutableList<Loan> = mutableListOf()
+    var loanRepaymentList: MutableList<LoanRepayment> = mutableListOf()
+    val addedLoans = mutableListOf<NewLoan>()
+    val addedLoanRepayments = mutableListOf<NewLoanRepayment>()
+    val deletedLoans = mutableListOf<String>()
+    val deletedLoanRepayments = mutableListOf<String>()
+
+    override suspend fun loans(): List<Loan> = loanList.toList()
+    override suspend fun loanRepayments(): List<LoanRepayment> = loanRepaymentList.toList()
+
+    override suspend fun addLoan(loan: NewLoan) {
+        failIfNeeded()
+        addedLoans += loan
+    }
+
+    override suspend fun deleteLoan(id: String) {
+        failIfNeeded()
+        deletedLoans += id
+        loanList.removeAll { it.id == id }
+        loanRepaymentList.removeAll { it.loanId == id }
+    }
+
+    override suspend fun setLoanForgiven(id: String, forgiven: Boolean) {
+        failIfNeeded()
+        loanList = loanList.map {
+            if (it.id == id) it.copy(forgivenAt = if (forgiven) Instant.parse("2026-10-16T12:00:00Z") else null) else it
+        }.toMutableList()
+    }
+
+    override suspend fun addLoanRepayment(repayment: NewLoanRepayment) {
+        failIfNeeded()
+        addedLoanRepayments += repayment
+    }
+
+    override suspend fun deleteLoanRepayment(id: String) {
+        failIfNeeded()
+        deletedLoanRepayments += id
+        loanRepaymentList.removeAll { it.id == id }
     }
 
     override suspend fun uploadEvidence(path: String, bytes: ByteArray, mimeType: String) {

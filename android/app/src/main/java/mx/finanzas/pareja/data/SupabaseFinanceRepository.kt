@@ -14,6 +14,7 @@ import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.ktor.http.ContentType
 import kotlin.time.Duration.Companion.hours
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
@@ -33,6 +34,7 @@ fun createSupabase(url: String, key: String): SupabaseClient =
     }
 
 private const val PAYEES_LOOKBACK = 500L // últimos pagos que se revisan para sugerir "Pagado a"
+private const val LOANS_LIMIT = 500L // préstamos y abonos que se cargan a la vez
 
 @Serializable
 private data class NewCategory(@SerialName("household_id") val householdId: String, val name: String)
@@ -316,6 +318,50 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
 
     override suspend fun deleteManualPayment(id: String) {
         client.postgrest.from("manual_payments").delete {
+            filter { eq("id", id) }
+        }
+    }
+
+    // ---- Préstamos
+    override suspend fun loans(): List<Loan> =
+        client.postgrest.from("loans").select {
+            order("occurred_on", Order.DESCENDING)
+            limit(LOANS_LIMIT)
+        }.decodeList<Loan>()
+
+    override suspend fun loanRepayments(): List<LoanRepayment> =
+        client.postgrest.from("loan_repayments").select {
+            order("paid_on", Order.DESCENDING)
+            limit(LOANS_LIMIT)
+        }.decodeList<LoanRepayment>()
+
+    override suspend fun addLoan(loan: NewLoan) {
+        client.postgrest.from("loans").insert(loan)
+    }
+
+    override suspend fun deleteLoan(id: String) {
+        client.postgrest.from("loans").delete {
+            filter { eq("id", id) }
+        }
+    }
+
+    override suspend fun setLoanForgiven(id: String, forgiven: Boolean) {
+        // JsonNull limpia el campo al reabrir el préstamo.
+        client.postgrest.from("loans").update(
+            buildJsonObject {
+                put("forgiven_at", if (forgiven) JsonPrimitive(Clock.System.now().toString()) else JsonNull)
+            },
+        ) {
+            filter { eq("id", id) }
+        }
+    }
+
+    override suspend fun addLoanRepayment(repayment: NewLoanRepayment) {
+        client.postgrest.from("loan_repayments").insert(repayment)
+    }
+
+    override suspend fun deleteLoanRepayment(id: String) {
+        client.postgrest.from("loan_repayments").delete {
             filter { eq("id", id) }
         }
     }

@@ -53,6 +53,8 @@ import mx.finanzas.pareja.ui.payments.PaymentFormScreen
 import mx.finanzas.pareja.ui.payments.PaymentsScreen
 import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.statements.StatementImportScreen
+import mx.finanzas.pareja.ui.loans.LoansScreen
+import mx.finanzas.pareja.ui.loans.LoansViewModel
 import mx.finanzas.pareja.ui.statements.StatementImportViewModel
 import mx.finanzas.pareja.ui.transactions.TransactionFormScreen
 import mx.finanzas.pareja.ui.transactions.TransactionFormViewModel
@@ -67,6 +69,7 @@ private const val ROUTE_TRANSACTIONS = "transactions"
 private const val ROUTE_CARDS = "cards"
 private const val ROUTE_ACCOUNT = "account"
 private const val ROUTE_PAYMENTS = "payments"
+private const val ROUTE_LOANS = "loans"
 private const val ROUTE_INBOX = "inbox"
 private const val ROUTE_STATEMENT_IMPORT = "statement_import"
 private const val ROUTE_FORM = "tx_form?id={id}"
@@ -196,6 +199,19 @@ fun MainScaffold(
                     refreshKey = refreshKey,
                     onNew = { nav.navigate("payment_form") },
                     onEdit = { id -> nav.navigate("payment_form?id=$id") },
+                    onOpenLoans = { nav.navigate(ROUTE_LOANS) },
+                )
+            }
+            composable(ROUTE_LOANS) {
+                val vm: LoansViewModel = viewModel(
+                    factory = viewModelFactory { LoansViewModel(repo, userId, householdId, today()) },
+                )
+                LoansScreen(
+                    vm = vm,
+                    userId = userId,
+                    memberNames = names,
+                    today = today(),
+                    onBack = { nav.popBackStack() },
                 )
             }
             composable(
