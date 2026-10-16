@@ -14,10 +14,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import mx.finanzas.pareja.FinanzasApp
+import mx.finanzas.pareja.alerts.AlertNotifier
+import mx.finanzas.pareja.alerts.AlertPrefs
 import mx.finanzas.pareja.alerts.AlertRunner
+import mx.finanzas.pareja.data.IngestResult
 import mx.finanzas.pareja.data.TxSource
 import mx.finanzas.pareja.domain.ChargeSources
+import mx.finanzas.pareja.domain.NewCharge
+import mx.finanzas.pareja.domain.ParsedCharge
 import mx.finanzas.pareja.domain.RawNotification
+import mx.finanzas.pareja.domain.chargeAlertsFor
 import mx.finanzas.pareja.domain.parseCharge
 
 /**
@@ -74,8 +80,9 @@ object CaptureSync {
         val householdId = runCatching { repo.members() }.getOrNull()
             ?.firstOrNull { it.userId == userId }?.householdId ?: return
 
+        val ingested = mutableListOf<Pair<ParsedCharge, IngestResult>>()
         app.captureStore.drain { charge ->
-            repo.ingestCapture(
+            val result = repo.ingestCapture(
                 householdId = householdId,
                 merchant = charge.merchant,
                 amount = charge.amount,
@@ -84,9 +91,26 @@ object CaptureSync {
                 source = TxSource.NOTIFICATION,
                 raw = charge.raw,
             )
+            ingested += charge to result
         }
+        // "Gastaste $X en Y": un aviso por cada cobro nuevo. Nunca debe romper el envío de los cobros.
+        runCatching { alertNewCharges(app, ingested) }
         // Un cobro nuevo puede hacer que se supere un presupuesto: se revisa en el momento.
         runCatching { AlertRunner.run(app) }
+    }
+
+    private suspend fun alertNewCharges(app: FinanzasApp, ingested: List<Pair<ParsedCharge, IngestResult>>) {
+        if (!AlertPrefs.isEnabled(app) || !AlertPrefs.isChargeAlertsEnabled(app)) return
+        if (ingested.none { (_, result) -> !result.duplicate }) return
+
+        // La tarjeta solo se consulta si el servidor identificó alguna.
+        val cards = if (ingested.any { (_, result) -> !result.duplicate && result.resolvedCardId != null }) {
+            app.repository.cards().associateBy { it.id }
+        } else emptyMap()
+        val results = ingested.map { (charge, result) ->
+            NewCharge(result.txId, charge.merchant, charge.amount, result.resolvedCardId?.let(cards::get)) to result.duplicate
+        }
+        chargeAlertsFor(results).forEach { AlertNotifier.post(app, it) }
     }
 
     /** ¿Tiene esta app el permiso de "Acceso a notificaciones"? */

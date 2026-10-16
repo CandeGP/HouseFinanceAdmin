@@ -14,11 +14,15 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import mx.finanzas.pareja.MainActivity
 import mx.finanzas.pareja.R
+import mx.finanzas.pareja.domain.AlertKind
 import mx.finanzas.pareja.domain.CycleAlert
 
 /** Publica las alertas de corte y pago como notificaciones locales. */
 object AlertNotifier {
     private const val CHANNEL_ID = "cycle_alerts"
+
+    // Los avisos de cada cobro van en su propio canal para poder silenciarlos aparte desde Android.
+    private const val CHARGES_CHANNEL_ID = "charge_alerts"
 
     /** ¿Puede la app mostrar notificaciones? En Android 13+ hace falta el permiso en tiempo de ejecución. */
     fun canNotify(context: Context): Boolean {
@@ -32,13 +36,14 @@ object AlertNotifier {
     @SuppressLint("MissingPermission") // canNotify() ya comprobó el permiso
     fun post(context: Context, alert: CycleAlert): Boolean {
         if (!canNotify(context)) return false
-        ensureChannel(context)
+        val channelId = if (alert.kind == AlertKind.CHARGE) CHARGES_CHANNEL_ID else CHANNEL_ID
+        ensureChannel(context, channelId)
 
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_house)
             .setContentTitle(alert.title)
             .setContentText(alert.text)
@@ -50,12 +55,16 @@ object AlertNotifier {
         return true
     }
 
-    private fun ensureChannel(context: Context) {
+    private fun ensureChannel(context: Context, channelId: String) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
+        if (manager.getNotificationChannel(channelId) != null) return
+        val (name, text) = if (channelId == CHARGES_CHANNEL_ID) {
+            "Cobros detectados" to "Un aviso por cada cobro que la app detecta en tus tarjetas"
+        } else {
+            "Alertas de corte y pago" to "Avisos de la fecha de corte y de pago de tus tarjetas y de tus presupuestos"
+        }
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Alertas de corte y pago", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Avisos de la fecha de corte y de pago de tus tarjetas" },
+            NotificationChannel(channelId, name, NotificationManager.IMPORTANCE_DEFAULT).apply { description = text },
         )
     }
 }

@@ -168,6 +168,7 @@ private fun LockCard() {
 private fun AlertsCard() {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(AlertPrefs.isEnabled(context)) }
+    var chargeAlerts by remember { mutableStateOf(AlertPrefs.isChargeAlertsEnabled(context)) }
     var denied by remember { mutableStateOf(false) }
 
     fun apply(value: Boolean) {
@@ -217,6 +218,27 @@ private fun AlertsCard() {
                 )
             }
             if (enabled) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Avisar cada cobro", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Una notificación \"Gastaste \$X en Y\" por cada cobro nuevo que la app detecta en tus tarjetas.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = chargeAlerts,
+                        onCheckedChange = { on ->
+                            AlertPrefs.setChargeAlertsEnabled(context, on)
+                            chargeAlerts = on
+                        },
+                    )
+                }
                 OutlinedButton(onClick = {
                     AlertNotifier.post(
                         context,

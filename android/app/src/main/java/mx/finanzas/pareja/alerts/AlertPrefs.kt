@@ -7,12 +7,23 @@ object AlertPrefs {
     private const val PREFS = "cycle_alerts"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_NOTIFIED = "notified"
+    private const val KEY_CHARGE_ALERTS = "charge_alerts"
     private const val MAX_REMEMBERED = 200
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
+
+    /**
+     * Aviso "Gastaste $X en Y" por cada cobro detectado. Encendido por defecto; solo avisa si las Alertas
+     * (el interruptor principal, que pide el permiso de notificaciones) están activas.
+     */
+    fun isChargeAlertsEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_CHARGE_ALERTS, true)
+
+    fun setChargeAlertsEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_CHARGE_ALERTS, enabled).apply()
+    }
 
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
