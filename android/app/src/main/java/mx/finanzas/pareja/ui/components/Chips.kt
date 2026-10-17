@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.domain.cardAccentArgb
@@ -29,7 +30,15 @@ fun CardChip(card: Card, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(10.dp).background(Color(cardAccentArgb(card)), CircleShape))
-        Text(cardLabel(card), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+        // Una línea con "…": un banco o nombre largo no debe partir la fila ni empujar el texto de al lado.
+        Text(
+            cardLabel(card),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
     }
 }
 

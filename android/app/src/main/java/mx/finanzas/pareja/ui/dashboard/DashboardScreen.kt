@@ -207,12 +207,14 @@ private fun CardRankItem(rank: CardRank, ownerName: String?, payment: NextPaymen
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(top = 4.dp),
                     ) {
-                        CardChip(card)
+                        CardChip(card, Modifier.weight(1f, fill = false))
                         if (ownerName != null) {
                             Text(
                                 "de $ownerName",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         }
                     }
