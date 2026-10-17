@@ -143,6 +143,9 @@ private val INTEREST_INSTALLMENT_LINE = Regex(
     RegexOption.IGNORE_CASE,
 )
 
+// Rappi parte la fecha en dos renglones: "2026-09- AMAZON A MESES ..." y debajo "03". Se vuelve a unir.
+private val SPLIT_ISO_DATE = Regex("""^(\d{4}-\d{2})-[ \t]+(.*)\r?\n(\d{2})[ \t]*$""", RegexOption.MULTILINE)
+
 private val CARD_CONTINUATION = Regex("""Tarjeta\s+(?:virtual|digital)[^\n]*?\*{2,4}\s*(\d{4})""", RegexOption.IGNORE_CASE)
 private val EMBEDDED_CARD = Regex("""\*{3}\s*(\d{4})""")
 private val PLATA_LEADING_CARD = Regex("""^(\d{4})\s+(.*)$""")
@@ -193,7 +196,8 @@ private fun markInstallmentCharges(
 }
 
 /** Parsea el texto completo de un estado de cuenta. Devuelve null si no encuentra fecha de corte. */
-fun parseStatement(text: String): ParsedStatement? {
+fun parseStatement(rawText: String): ParsedStatement? {
+    val text = SPLIT_ISO_DATE.replace(rawText, "$1-$3 $2")
     val summary = parseSummary(text) ?: return null
 
     val movements = mutableListOf<StatementMovement>()
