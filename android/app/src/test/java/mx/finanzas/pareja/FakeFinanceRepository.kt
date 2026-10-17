@@ -3,6 +3,7 @@ package mx.finanzas.pareja
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.data.CardBalanceCheck
+import mx.finanzas.pareja.data.MsiInstallment
 import mx.finanzas.pareja.data.NewCardBalanceCheck
 import mx.finanzas.pareja.data.ManualPayment
 import mx.finanzas.pareja.data.ManualPaymentPatch
@@ -173,6 +174,14 @@ class FakeFinanceRepository : FinanceRepository {
     }
 
     override suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate? = estimates[cardId]
+
+    var msiInstallments: List<MsiInstallment> = emptyList()
+    var msiScheduleFailWith: Exception? = null
+
+    override suspend fun msiSchedule(ref: LocalDate, months: Int): List<MsiInstallment> {
+        msiScheduleFailWith?.let { throw it }
+        return msiInstallments
+    }
 
     var balanceCheckList: MutableList<CardBalanceCheck> = mutableListOf()
     val addedBalanceChecks = mutableListOf<NewCardBalanceCheck>()

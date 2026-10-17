@@ -46,6 +46,7 @@ fun DashboardScreen(
     refreshKey: Int,
     onAddCard: () -> Unit,
     onOpenInbox: () -> Unit,
+    onOpenInstallments: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(refreshKey) { if (refreshKey > 0) vm.load() }
@@ -92,6 +93,7 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item { QuincenaCards(state.quincenas) }
+                item { InstallmentsEntry(onOpenInstallments) }
                 if (state.recurring.isNotEmpty()) item { RecurringCard(state.recurring) }
                 items(sortByDue(state.summary.ranking, state.nextPayments), key = { it.view.card.id }) { rank ->
                     CardRankItem(
@@ -102,6 +104,21 @@ fun DashboardScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Acceso al calendario de mensualidades de compras a meses, mes por mes. */
+@Composable
+private fun InstallmentsEntry(onOpen: () -> Unit) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Compras a meses", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Mira cuánto pagarás de mensualidades en los próximos meses",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

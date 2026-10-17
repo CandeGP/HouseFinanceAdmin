@@ -51,6 +51,10 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 - **Resumen por quincena**: dos bloques con lo que se paga del 1 al 15 y del 16 a fin de mes. Pasado el 15, el
   primero pasa a "Próximo mes a pagar 1ª quincena". Cada tarjeta muestra lo que toca pagar, su fecha ("vence
   en 9 días") y "Debes en total"; se ordenan por vencimiento.
+- **Calendario de compras a meses**: desde el Resumen ves, mes por mes, cuánto pagarás de mensualidades, de
+  qué compra es cada una ("6 de 9"), cuáles terminan y cuánto te falta en total. Sale de todas las compras a
+  meses, vengan de un estado de cuenta o de captura manual (también las de tarjetas archivadas), con las mismas
+  reglas que el ciclo de cada tarjeta.
 - **Conciliar con el banco**: capturas el "saldo utilizado" que muestra tu banco y la app te dice si cuadra o
   cuánto falta. Los estados de cuenta también cancelan una compra con su devolución y reconstruyen las compras
   a meses de bancos que solo listan cada mensualidad (Banamex).

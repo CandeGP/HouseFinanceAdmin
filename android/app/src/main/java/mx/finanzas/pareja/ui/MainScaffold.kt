@@ -55,6 +55,8 @@ import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.statements.StatementImportScreen
 import mx.finanzas.pareja.ui.budgets.CategoryBudgetsScreen
 import mx.finanzas.pareja.ui.budgets.CategoryBudgetsViewModel
+import mx.finanzas.pareja.ui.installments.InstallmentsScreen
+import mx.finanzas.pareja.ui.installments.InstallmentsViewModel
 import mx.finanzas.pareja.ui.reports.ReportsScreen
 import mx.finanzas.pareja.ui.reports.ReportsViewModel
 import mx.finanzas.pareja.ui.loans.LoansScreen
@@ -76,6 +78,7 @@ private const val ROUTE_PAYMENTS = "payments"
 private const val ROUTE_LOANS = "loans"
 private const val ROUTE_CATEGORY_BUDGETS = "category_budgets"
 private const val ROUTE_REPORTS = "reports"
+private const val ROUTE_INSTALLMENTS = "installments"
 private const val ROUTE_INBOX = "inbox"
 private const val ROUTE_STATEMENT_IMPORT = "statement_import"
 private const val ROUTE_FORM = "tx_form?id={id}"
@@ -147,7 +150,14 @@ fun MainScaffold(
                     refreshKey = refreshKey,
                     onAddCard = { nav.navigate(ROUTE_CARDS) },
                     onOpenInbox = { nav.navigate(ROUTE_INBOX) },
+                    onOpenInstallments = { nav.navigate(ROUTE_INSTALLMENTS) },
                 )
+            }
+            composable(ROUTE_INSTALLMENTS) {
+                val vm: InstallmentsViewModel = viewModel(
+                    factory = viewModelFactory { InstallmentsViewModel(repo, userId, today()) },
+                )
+                InstallmentsScreen(vm = vm, onBack = { nav.popBackStack() })
             }
             composable(ROUTE_INBOX) {
                 val vm: InboxViewModel = viewModel(

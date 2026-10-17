@@ -163,6 +163,15 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
             },
         ).decodeList<CycleEstimate>().firstOrNull()
 
+    override suspend fun msiSchedule(ref: LocalDate, months: Int): List<MsiInstallment> =
+        client.postgrest.rpc(
+            "msi_schedule",
+            buildJsonObject {
+                put("p_ref", ref.toString())
+                put("p_months", months)
+            },
+        ).decodeList<MsiInstallment>()
+
     override suspend fun balanceChecks(): List<CardBalanceCheck> =
         client.postgrest.from("card_balance_checks").select {
             order("checked_on", Order.DESCENDING)

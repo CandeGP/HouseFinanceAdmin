@@ -75,6 +75,9 @@ interface FinanceRepository {
     suspend fun restoreCard(id: String)
     suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate?
 
+    /** Mensualidades que faltan de las compras a meses, ciclo por ciclo, desde el ciclo abierto de cada tarjeta. */
+    suspend fun msiSchedule(ref: LocalDate, months: Int = 12): List<MsiInstallment>
+
     /** Capturas del saldo del banco, la más reciente primero. */
     suspend fun balanceChecks(): List<CardBalanceCheck>
     suspend fun addBalanceCheck(check: NewCardBalanceCheck)
