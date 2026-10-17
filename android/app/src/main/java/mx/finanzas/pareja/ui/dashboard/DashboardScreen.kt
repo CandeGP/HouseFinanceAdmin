@@ -109,10 +109,14 @@ fun DashboardScreen(
 @Composable
 private fun QuincenaCards(totals: QuincenaTotals) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        val nextFirstEnd = totals.nextFirstEnd
         QuincenaCard(
-            "A pagar 1ª quincena", "Vence del 1 al 15", totals.first,
-            MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer,
-            Modifier.weight(1f),
+            title = if (nextFirstEnd != null) "Próximo mes a pagar 1ª quincena" else "A pagar 1ª quincena",
+            range = if (nextFirstEnd != null) "Vence del 1 al ${formatDayMonthEs(nextFirstEnd)}" else "Vence del 1 al 15",
+            quincena = totals.first,
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.weight(1f),
         )
         QuincenaCard(
             "A pagar 2ª quincena", "Vence del 16 a fin de mes", totals.second,
@@ -148,6 +152,13 @@ private fun QuincenaCard(
                 },
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (quincena.overdue > 0) {
+                Text(
+                    "Incluye ${formatMxn(quincena.overdue)} vencido",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ import mx.finanzas.pareja.data.CardPayStatus
 import mx.finanzas.pareja.estimate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -58,25 +59,61 @@ class NextPaymentsTest {
     private fun pay(amount: Double, due: LocalDate) =
         NextPayment(amount, due, fromClosedCycle = true, overdue = false, paidClosedCycle = false)
 
+    private val early = LocalDate(2026, 10, 10)
+
     @Test
-    fun `separa las quincenas por la fecha de pago y el 15 es de la primera`() {
+    fun `del 1 al 15 separa las quincenas por la fecha de pago y el 15 es de la primera`() {
         val totals = quincenaTotals(
             listOf(pay(100.0, LocalDate(2026, 10, 13)), pay(50.0, LocalDate(2026, 10, 15)), pay(300.0, LocalDate(2026, 10, 16)), pay(25.0, LocalDate(2026, 10, 31))),
-            today,
+            early,
         )
         assertEquals(Quincena(150.0, 2), totals.first)
         assertEquals(Quincena(325.0, 2), totals.second)
+        assertNull(totals.nextFirstEnd)
     }
 
     @Test
-    fun `los pagos de otros meses y los de cero no cuentan`() {
-        val totals = quincenaTotals(listOf(pay(900.0, LocalDate(2026, 11, 5)), pay(0.0, LocalDate(2026, 10, 20))), today)
+    fun `del 1 al 15 los pagos de otros meses y los de cero no cuentan`() {
+        val totals = quincenaTotals(listOf(pay(900.0, LocalDate(2026, 11, 5)), pay(0.0, LocalDate(2026, 10, 20))), early)
         assertEquals(NO_QUINCENAS, totals)
     }
 
     @Test
-    fun `lo vencido de un mes anterior sigue sumando`() {
-        val totals = quincenaTotals(listOf(pay(200.0, LocalDate(2026, 9, 26))), today)
-        assertEquals(Quincena(200.0, 1), totals.second)
+    fun `pasado el 15 el primer bloque es la primera quincena del mes que viene`() {
+        val totals = quincenaTotals(
+            listOf(
+                pay(700.0, LocalDate(2026, 11, 12)), pay(300.0, LocalDate(2026, 11, 15)), // 1ª de noviembre
+                pay(900.0, LocalDate(2026, 11, 26)), // 2ª de noviembre: no cuenta todavía
+                pay(400.0, LocalDate(2026, 10, 26)), // sigue por pagar este mes
+            ),
+            today,
+        )
+        assertEquals(LocalDate(2026, 11, 15), totals.nextFirstEnd)
+        assertEquals(Quincena(1000.0, 2), totals.first)
+        assertEquals(Quincena(400.0, 1), totals.second)
+    }
+
+    @Test
+    fun `pasado el 15 lo vencido y sin pagar sigue visible en el segundo bloque`() {
+        val vencido = NextPayment(200.0, LocalDate(2026, 10, 13), fromClosedCycle = true, overdue = true, paidClosedCycle = false)
+        val totals = quincenaTotals(listOf(vencido, pay(50.0, LocalDate(2026, 10, 25))), today)
+
+        assertEquals(Quincena(250.0, 2, overdue = 200.0), totals.second)
+        assertEquals(Quincena(0.0, 0), totals.first)
+    }
+
+    @Test
+    fun `en diciembre el mes que viene es enero del otro año`() {
+        val totals = quincenaTotals(listOf(pay(120.0, LocalDate(2027, 1, 10))), LocalDate(2026, 12, 20))
+        assertEquals(LocalDate(2027, 1, 15), totals.nextFirstEnd)
+        assertEquals(Quincena(120.0, 1), totals.first)
+    }
+
+    @Test
+    fun `las obligaciones juntan el corte sin pagar y el ciclo abierto`() {
+        val list = paymentObligations(view, cycleStatus(CardPayStatus.PENDING, target = 2010.97), today)
+
+        assertEquals(listOf(2010.97, 2278.48), list.map { it.amount })
+        assertEquals(list.first(), nextPayment(view, cycleStatus(CardPayStatus.PENDING, target = 2010.97), today))
     }
 }

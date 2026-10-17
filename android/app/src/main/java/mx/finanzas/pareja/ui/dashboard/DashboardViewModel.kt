@@ -22,6 +22,7 @@ import mx.finanzas.pareja.domain.NO_QUINCENAS
 import mx.finanzas.pareja.domain.NextPayment
 import mx.finanzas.pareja.domain.QuincenaTotals
 import mx.finanzas.pareja.domain.nextPayment
+import mx.finanzas.pareja.domain.paymentObligations
 import mx.finanzas.pareja.domain.quincenaTotals
 import mx.finanzas.pareja.domain.RECURRING_LOOKBACK_MONTHS
 import mx.finanzas.pareja.domain.RecurringCharge
@@ -106,7 +107,10 @@ class DashboardViewModel(
                 summary = buildDashboard(visible),
                 recurring = detectRecurring(visibleTransactions, now),
                 nextPayments = payments,
-                quincenas = quincenaTotals(payments.values.toList(), now),
+                quincenas = quincenaTotals(
+                    visible.flatMap { view -> paymentObligations(view, _state.value.statuses[view.card.id], now) },
+                    now,
+                ),
             )
         }
     }
