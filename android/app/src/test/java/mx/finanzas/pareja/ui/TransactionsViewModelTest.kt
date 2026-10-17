@@ -39,6 +39,70 @@ class TransactionsViewModelTest {
         assertEquals(listOf("oct-mine"), vm.state.value.items.map { it.id })
     }
 
+    private fun inst(card: String, merchant: String, due: LocalDate, n: Int, total: Int, amount: Double) =
+        mx.finanzas.pareja.data.MsiInstallment(
+            cardId = card, transactionId = "t-$merchant-$n", merchant = merchant,
+            cycleEnd = due, dueDate = due, number = n, installments = total, amount = amount,
+        )
+
+    private fun withInstallments() = repo.apply {
+        cardList = listOf(mx.finanzas.pareja.card("mia"), mx.finanzas.pareja.card("suya").copy(ownerId = "u2"))
+        msiInstallments = listOf(
+            inst("mia", "AOC", LocalDate(2026, 11, 9), 5, 9, 948.61),
+            inst("suya", "Converse", LocalDate(2026, 11, 26), 1, 6, 416.50),
+            inst("mia", "AOC", LocalDate(2026, 12, 9), 6, 9, 948.61),
+        )
+    }
+
+    @Test
+    fun `un mes futuro sin gastos muestra las mensualidades de compras a meses que se pagan ese mes`() {
+        withInstallments()
+        val vm = vm()
+        vm.nextMonth()
+
+        val s = vm.state.value
+        assertEquals(11, s.month)
+        assertEquals(emptyList<String>(), s.items.map { it.id })
+        assertEquals(listOf("AOC", "Converse"), s.installments.map { it.merchant })
+    }
+
+    @Test
+    fun `cada mes trae solo sus mensualidades`() {
+        withInstallments()
+        val vm = vm()
+        vm.nextMonth()
+        vm.nextMonth()
+
+        assertEquals(listOf("AOC"), vm.state.value.installments.map { it.merchant })
+        assertEquals(12, vm.state.value.installments.single().dueDate.monthNumber)
+    }
+
+    @Test
+    fun `el mes actual sin mensualidades no muestra nada extra`() {
+        withInstallments()
+        assertEquals(emptyList<Any>(), vm().state.value.installments)
+    }
+
+    @Test
+    fun `en Mios solo cuentan las mensualidades de mis tarjetas`() {
+        withInstallments()
+        val vm = vm()
+        vm.nextMonth()
+        vm.setScope(Scope.MINE)
+
+        assertEquals(listOf("AOC"), vm.state.value.installments.map { it.merchant })
+    }
+
+    @Test
+    fun `si falla el calendario los gastos del mes siguen apareciendo`() {
+        withInstallments().msiScheduleFailWith = RuntimeException("sin conexión")
+        val s = vm().state.value
+
+        assertEquals(setOf("oct-mine", "oct-partner"), s.items.map { it.id }.toSet())
+        assertEquals(emptyList<Any>(), s.installments)
+        assertEquals(null, s.error)
+    }
+
     @Test
     fun `mes anterior cruza al mes previo`() {
         val vm = vm()

@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.Card as CardModel
+import mx.finanzas.pareja.data.MsiInstallment
 import mx.finanzas.pareja.data.PaymentMode
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TxStatus
@@ -107,6 +108,14 @@ fun TransactionsScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
+            if (state.installments.isNotEmpty()) {
+                Text(
+                    "Mensualidades de compras a meses: ${formatMxn(state.installments.sumOf { it.amount })}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
             ErrorText(state.error, Modifier.padding(horizontal = 16.dp))
 
             TabRow(selectedTabIndex = tab) {
@@ -116,7 +125,7 @@ fun TransactionsScreen(
             }
 
             when {
-                state.items.isEmpty() && !state.loading ->
+                state.items.isEmpty() && state.installments.isEmpty() && !state.loading ->
                     EmptyState(
                         title = "Sin gastos este mes",
                         subtitle = "Registra un gasto con el botón +.",
@@ -125,6 +134,28 @@ fun TransactionsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (state.installments.isNotEmpty()) {
+                        item(key = "installments-header") {
+                            Text(
+                                "Mensualidades programadas",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        items(state.installments, key = { "inst-${it.transactionId}-${it.dueDate}" }) { inst ->
+                            ScheduledInstallmentRow(inst, cardsById[inst.cardId])
+                        }
+                        if (state.items.isNotEmpty()) {
+                            item(key = "movements-header") {
+                                Text(
+                                    "Movimientos",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                        }
+                    }
                     items(state.items, key = { it.id }) { tx ->
                         val mine = tx.ownerId == userId
                         TransactionRow(
@@ -153,6 +184,34 @@ fun TransactionsScreen(
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancelar") } },
         )
+    }
+}
+
+/** Mensualidad futura de una compra a meses: no es un gasto nuevo, es lo que toca pagar ese mes. */
+@Composable
+private fun ScheduledInstallmentRow(item: MsiInstallment, card: CardModel?) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(item.merchant, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text(
+                    "Vence ${formatDayMonthEs(item.dueDate)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (card != null) CardChip(card)
+                Text(
+                    "MSI · mensualidad ${item.number} de ${item.installments}" + if (item.isLast) " · última" else "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(formatMxn(item.amount), style = MaterialTheme.typography.titleSmall)
+        }
     }
 }
 
