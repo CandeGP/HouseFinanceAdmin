@@ -24,7 +24,59 @@ data class Reconciliation(
     val installmentCharges: List<StatementMovement>,
     val matchedInstallments: List<InstallmentMatch>,
     val missingInstallments: List<StatementInstallment>,
+    /** Compras que el mismo estado devolvió: compra y devolución se cancelan y no se importan. */
+    val refunded: List<RefundPair> = emptyList(),
+    /** Gastos ya capturados en la app que el banco devolvió: casi seguro hay que borrarlos. */
+    val refundedInApp: List<Transaction> = emptyList(),
+    /** Abonos que no son pago ni devuelven una compra de este estado (compras anteriores, bonificaciones…). */
+    val refundsWithoutCharge: List<StatementMovement> = emptyList(),
 )
+
+/** Una compra y la devolución que la anula dentro del mismo estado. */
+data class RefundPair(val charge: StatementMovement, val refund: StatementMovement)
+
+/** La compra puede aparecer unos días después de su devolución en el listado; no antes de este margen. */
+private const val REFUND_ORDER_SLACK_DAYS = 2
+private const val REFUND_MIN_SIMILARITY = 0.5
+
+private fun pairRefunds(
+    refunds: List<StatementMovement>,
+    charges: List<StatementMovement>,
+): Triple<List<RefundPair>, List<StatementMovement>, List<StatementMovement>> {
+    val left = charges.toMutableList()
+    val pairs = mutableListOf<RefundPair>()
+    val orphans = mutableListOf<StatementMovement>()
+    for (refund in refunds.sortedBy { it.operationDate }) {
+        val charge = left
+            .filter {
+                abs(it.amount + refund.amount) < AMOUNT_EPSILON &&
+                    it.operationDate <= refund.operationDate.plusDays(REFUND_ORDER_SLACK_DAYS) &&
+                    merchantSimilarity(it.description, refund.description) >= REFUND_MIN_SIMILARITY
+            }
+            .maxWithOrNull(
+                compareBy<StatementMovement> { merchantSimilarity(it.description, refund.description) }
+                    .thenBy { -daysBetween(it.operationDate, refund.operationDate) },
+            )
+        if (charge != null) {
+            pairs += RefundPair(charge, refund)
+            left.remove(charge)
+        } else {
+            orphans += refund
+        }
+    }
+    return Triple(pairs, orphans, left)
+}
+
+private fun bestMatch(pool: List<Transaction>, movement: StatementMovement, toleranceDays: Int): Transaction? =
+    pool
+        .filter {
+            abs(it.amount - movement.amount) < AMOUNT_EPSILON &&
+                daysBetween(it.occurredAt, movement.operationDate) <= toleranceDays
+        }
+        .maxWithOrNull(
+            compareBy<Transaction> { merchantSimilarity(it.merchant, movement.description) }
+                .thenBy { -daysBetween(it.occurredAt, movement.operationDate) },
+        )
 
 private const val AMOUNT_EPSILON = 0.005
 
@@ -77,7 +129,11 @@ fun reconcile(
 
     val payments = statement.movements.filter { it.amount < 0 }
     val installmentCharges = statement.movements.filter { it.amount > 0 && it.isInstallmentCharge }
-    val charges = statement.movements.filter { it.amount > 0 && !it.isInstallmentCharge }
+    // Una compra devuelta en el mismo estado se cancela con su devolución: ni se importa ni cuenta como gasto.
+    val refunds = statement.movements.filter { it.amount < 0 && !it.isCardPayment() }
+    val (refundPairs, refundsWithoutCharge, charges) = pairRefunds(
+        refunds, statement.movements.filter { it.amount > 0 && !it.isInstallmentCharge },
+    )
 
     // Gastos de contado que podrían corresponder a un cargo (con holgura alrededor del periodo).
     val pool = regular
@@ -87,19 +143,16 @@ fun reconcile(
         }
         .toMutableList()
 
+    // Si esa compra devuelta ya estaba capturada, se avisa (y no se reporta de nuevo como "no aparece").
+    val refundedInApp = refundPairs.mapNotNull { pair ->
+        bestMatch(pool, pair.charge, toleranceDays)?.also { pool.remove(it) }
+    }
+
     val matched = mutableListOf<StatementMatch>()
     val missing = mutableListOf<StatementMovement>()
 
     for (movement in charges.sortedBy { it.operationDate }) {
-        val best = pool
-            .filter {
-                abs(it.amount - movement.amount) < AMOUNT_EPSILON &&
-                    daysBetween(it.occurredAt, movement.operationDate) <= toleranceDays
-            }
-            .maxWithOrNull(
-                compareBy<Transaction> { merchantSimilarity(it.merchant, movement.description) }
-                    .thenBy { -daysBetween(it.occurredAt, movement.operationDate) },
-            )
+        val best = bestMatch(pool, movement, toleranceDays)
         if (best != null) {
             matched += StatementMatch(movement, best)
             pool.remove(best)
@@ -118,7 +171,8 @@ fun reconcile(
     val missingInstallments = mutableListOf<StatementInstallment>()
     for (installment in statement.installments) {
         val best = msiPool
-            .filter { abs(it.amount - installment.originalAmount) < AMOUNT_EPSILON }
+            // Un centavo por mensualidad de holgura: el original reconstruido (mensualidad × meses) puede diferir del real.
+            .filter { abs(it.amount - installment.originalAmount) < maxOf(AMOUNT_EPSILON, 0.01 * installment.total) }
             .maxByOrNull { merchantSimilarity(it.merchant, installment.description) }
         if (best != null) {
             matchedInstallments += InstallmentMatch(installment, best)
@@ -136,6 +190,9 @@ fun reconcile(
         installmentCharges = installmentCharges,
         matchedInstallments = matchedInstallments,
         missingInstallments = missingInstallments,
+        refunded = refundPairs,
+        refundedInApp = refundedInApp,
+        refundsWithoutCharge = refundsWithoutCharge,
     )
 }
 

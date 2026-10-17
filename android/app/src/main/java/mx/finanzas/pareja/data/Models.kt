@@ -251,6 +251,26 @@ data class CardCycleStatus(
     val status: CardPayStatus,
 )
 
+/** Saldo utilizado que mostraba el banco en [checkedOn]; sirve para compararlo con lo que suma la app. */
+@Serializable
+data class CardBalanceCheck(
+    val id: String,
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("card_id") val cardId: String,
+    @SerialName("bank_balance") val bankBalance: Double,
+    @SerialName("checked_on") val checkedOn: LocalDate,
+)
+
+@Serializable
+data class NewCardBalanceCheck(
+    @SerialName("household_id") val householdId: String,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("card_id") val cardId: String,
+    @SerialName("bank_balance") val bankBalance: Double,
+    @SerialName("checked_on") val checkedOn: LocalDate,
+)
+
 /** Pago hecho a una tarjeta, ligado al ciclo (fecha de corte) que cubre. */
 @Serializable
 data class CardPayment(

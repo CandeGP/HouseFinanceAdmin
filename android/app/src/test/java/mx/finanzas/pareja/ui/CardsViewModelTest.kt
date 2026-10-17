@@ -189,6 +189,65 @@ class CardsViewModelTest {
     private fun vmOn(today: LocalDate) = CardsViewModel(repo, userId = "u1", householdId = "h1", today = today)
 
     @Test
+    fun `capturar el saldo del banco lo guarda con la fecha de hoy y lo muestra como ultima captura`() {
+        val vm = vmOn(oct16)
+        vm.saveBalanceCheck(vm.state.value.cards.single(), "$11,311.06")
+
+        val saved = repo.addedBalanceChecks.single()
+        assertEquals("activa", saved.cardId)
+        assertEquals(11311.06, saved.bankBalance, 0.0)
+        assertEquals(oct16, saved.checkedOn)
+        assertEquals(11311.06, vm.state.value.balanceChecks.getValue("activa").bankBalance, 0.0)
+        assertEquals(true, vm.state.value.balanceSaved)
+    }
+
+    @Test
+    fun `un saldo invalido no se guarda y muestra el error`() {
+        val vm = vmOn(oct16)
+        vm.saveBalanceCheck(vm.state.value.cards.single(), "abc")
+
+        assertEquals(emptyList<Any>(), repo.addedBalanceChecks)
+        assertEquals("Escribe el saldo que muestra el banco (puede ser 0)", vm.state.value.balanceError)
+    }
+
+    @Test
+    fun `si el servidor falla al guardar el saldo el error queda para el dialogo y no se cierra`() {
+        repo.balanceCheckFailWith = RuntimeException("sin conexión")
+        val vm = vmOn(oct16)
+        vm.saveBalanceCheck(vm.state.value.cards.single(), "100")
+
+        val s = vm.state.value
+        assertEquals(false, s.balanceSaved)
+        assertEquals(true, s.balanceError != null)
+        assertEquals(null, s.message)
+    }
+
+    @Test
+    fun `un saldo de cero es valido porque la tarjeta puede estar liquidada`() {
+        val vm = vmOn(oct16)
+        vm.saveBalanceCheck(vm.state.value.cards.single(), "0")
+
+        assertEquals(0.0, repo.addedBalanceChecks.single().bankBalance, 0.0)
+    }
+
+    @Test
+    fun `no se captura el saldo de una tarjeta ajena`() {
+        repo.cardList = listOf(card("ajena").copy(ownerId = "u2"))
+        val vm = vmOn(oct16)
+        vm.saveBalanceCheck(vm.state.value.cards.single(), "100")
+
+        assertEquals(emptyList<Any>(), repo.addedBalanceChecks)
+    }
+
+    @Test
+    fun `la deuda que calcula la app por tarjeta queda a la mano para compararla`() {
+        repo.estimates["activa"] = mx.finanzas.pareja.estimate(cycleTotal = 500.0, msiRemaining = 200.0)
+        repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PENDING, target = 300.0)
+
+        assertEquals(1000.0, vmOn(oct16).state.value.appDebts.getValue("activa"), 0.0)
+    }
+
+    @Test
     fun `registrar un pago de dias atras lo guarda con esa fecha`() {
         repo.cycleStatuses["activa"] = cycleStatus(CardPayStatus.PENDING)
         val vm = vmOn(oct16)

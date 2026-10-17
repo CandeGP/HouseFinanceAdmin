@@ -170,6 +170,39 @@ private fun ReviewContent(
         Section("Faltan en la app", "Nada: todo lo del estado ya está registrado.")
     }
 
+    if (rec.refunded.isNotEmpty()) {
+        Section(
+            "Compras devueltas (${rec.refunded.size})",
+            "El banco las devolvió en este mismo estado, así que no se importan: " +
+                rec.refunded.joinToString { "${it.charge.description} ${formatMxn(it.charge.amount)}" } + ".",
+        )
+    }
+    if (rec.refundedInApp.isNotEmpty()) {
+        Text(
+            "Ya en la app, pero el banco las devolvió (${rec.refundedInApp.size})",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+        rec.refundedInApp.forEach { tx ->
+            Text(
+                "${formatDateEs(tx.occurredAt)} · ${tx.merchant} · ${formatMxn(tx.amount)}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Text(
+            "Lo más probable es que haya que borrarlas de tus gastos.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (rec.refundsWithoutCharge.isNotEmpty()) {
+        Section(
+            "Otros abonos (${rec.refundsWithoutCharge.size})",
+            "${formatMxn(-rec.refundsWithoutCharge.sumOf { it.amount })} que no son pago ni anulan una compra de este " +
+                "estado (devoluciones de compras anteriores, bonificaciones). Bajan lo que debes.",
+        )
+    }
+
     if (rec.missingInstallments.isNotEmpty()) {
         Text("Compras a meses por registrar (${rec.missingInstallments.size})", style = MaterialTheme.typography.titleSmall)
         rec.missingInstallments.forEach { i ->

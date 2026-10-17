@@ -43,7 +43,21 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 - **Estados de cuenta en PDF**: lectura en el teléfono y conciliación contra lo registrado. Los PDFs
   **escaneados** se leen con OCR local (ML Kit). Probado con Plata, Rappi, BBVA, Nu y Santander.
 - **Pagos en efectivo o transferencia** con evidencia (foto/PDF) en un bucket privado.
-- **Alertas de corte y pago**: avisos 3 días antes, 1 día antes y el mismo día (WorkManager).
+- **Alertas de corte y pago**: avisos 3 días antes, 1 día antes y el mismo día (WorkManager). Tampoco
+  avisan de lo que ya se pagó. Aparte: aviso al acercarse o pasarse del presupuesto, un aviso por cada cobro
+  detectado ("Gastaste $X en Y", con su propio canal y interruptor) y recordatorio cada 15 días de un préstamo abierto.
+- **Pagos a tarjeta**: cada corte cerrado queda `pagado`, `solo mínimo`, `parcial`, `pendiente` o `vencido`
+  (o "sin registro" si la tarjeta nunca ha registrado un pago). Los pagos del estado de cuenta se detectan solos.
+- **Resumen por quincena**: dos bloques con lo que se paga del 1 al 15 y del 16 a fin de mes. Pasado el 15, el
+  primero pasa a "Próximo mes a pagar 1ª quincena". Cada tarjeta muestra lo que toca pagar, su fecha ("vence
+  en 9 días") y "Debes en total"; se ordenan por vencimiento.
+- **Conciliar con el banco**: capturas el "saldo utilizado" que muestra tu banco y la app te dice si cuadra o
+  cuánto falta. Los estados de cuenta también cancelan una compra con su devolución y reconstruyen las compras
+  a meses de bancos que solo listan cada mensualidad (Banamex).
+- **Préstamos entre personas**, aparte de los gastos: abonos, saldo por persona y perdón de la deuda.
+- **Presupuestos por categoría** individuales (cada quien el suyo; el gasto del hogar es visible para los dos),
+  **gastos recurrentes** detectados y **reportes** de mes contra mes por categoría y por tarjeta.
+- **Bloqueo con huella o PIN** del teléfono (opcional).
 - **Dashboard web** de solo lectura con edición de monto y categoría, mismo login que la app.
 - **Actualizaciones dentro de la app**: al abrirla avisa si hay versión nueva (`latest.json` en el bucket
   público), la descarga, verifica su SHA-256 y abre el instalador de Android. También en Cuenta →
@@ -69,7 +83,15 @@ docs/      Capturas del README
 - El día de corte pertenece al ciclo que cierra; lo del día siguiente entra al corte siguiente.
 - MSI: se registra el número de mensualidades y **en cuál va**; cada ciclo posterior carga una mensualidad.
 - % de uso = (total del ciclo + saldo MSI pendiente) / límite de crédito.
-- El banco manda: importar un estado de cuenta ajusta corte, pago y límite de la tarjeta.
+- "Debes en total" = corte anterior sin pagar + total del ciclo + mensualidades que faltan. El saldo MSI incluye
+  las compras con mensualidad 0 (la primera cae en el corte siguiente).
+- El banco manda: importar un estado de cuenta ajusta corte, pago y límite de la tarjeta. La **fecha límite de
+  pago** sale del estado de cuenta; si el ciclo aún no tiene estado, se copia el desfase en meses del último
+  (hay bancos que cobran el mes siguiente al corte).
+- Un estado de cuenta ya viene neto de los pagos hechos antes de su corte: por eso no se arrastra el sobrante
+  del ciclo anterior cuando el monto sale de un estado importado.
+- Un gasto a meses se cuenta por su mensualidad en el ciclo, no por su monto total. Los préstamos entre
+  personas van aparte y no afectan los reportes de gasto.
 
 ## Desarrollo local
 
@@ -117,12 +139,13 @@ Authentication si no quieres confirmar correos.
 
 ## Pruebas
 
-- **Android**: más de 220 pruebas unitarias (parsers de cobros y estados, OCR, alertas, ciclos, conciliación).
+- **Android**: más de 440 pruebas unitarias (parsers de cobros y estados, OCR, alertas, ciclos, conciliación,
+  quincenas, préstamos, reportes).
 - **Base de datos**: pgTAP por archivo en `supabase/tests/database/`.
   Los archivos usan correos de prueba fijos: si tu base local ya tiene ese usuario, corre uno por uno.
 
 ## Estado
 
-Hecho: todo lo anterior.
-Pendiente: APK de release firmado, despliegue de la web, presupuestos por categoría, gastos recurrentes,
-captura por Gmail.
+Hecho: todo lo anterior, incluido el APK de release firmado y publicado, y la web desplegada.
+Pendiente: respaldos automáticos de la base, exportar a CSV, captura por Gmail y sugerir abonos de préstamos
+desde transferencias recibidas.

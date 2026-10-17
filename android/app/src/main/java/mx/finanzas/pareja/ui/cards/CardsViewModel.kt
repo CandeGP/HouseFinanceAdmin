@@ -21,8 +21,11 @@ import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.NewCardPayment
-import mx.finanzas.pareja.data.cycleStatuses
+import mx.finanzas.pareja.data.CardBalanceCheck
+import mx.finanzas.pareja.data.NewCardBalanceCheck
 import mx.finanzas.pareja.data.userMessage
+import mx.finanzas.pareja.domain.debtTotal
+import mx.finanzas.pareja.domain.parseBankBalance
 import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardPaymentDraft
 import mx.finanzas.pareja.domain.CardPaymentResult
@@ -50,6 +53,12 @@ data class CardsUiState(
     val payments: Map<String, List<CardPayment>> = emptyMap(),
     val paymentError: String? = null,
     val paymentSaved: Boolean = false,
+    /** Lo que la app calcula que se debe en total por tarjeta (para compararlo con el banco). */
+    val appDebts: Map<String, Double> = emptyMap(),
+    /** Última captura del saldo del banco por tarjeta. */
+    val balanceChecks: Map<String, CardBalanceCheck> = emptyMap(),
+    val balanceError: String? = null,
+    val balanceSaved: Boolean = false,
 )
 
 private val DEFAULT_ZONE = TimeZone.of("America/Mexico_City")
@@ -75,13 +84,18 @@ class CardsViewModel(
                 val spend = active.filter { it.monthlyBudget != null }
                     .mapNotNull { card -> repo.cardMonthSpend(card.id, today)?.let { card.id to it } }
                     .toMap()
-                val statuses = repo.cycleStatuses(active.map { it.id }, today)
+                val snapshots = repo.cardSnapshots(active.map { it.id }, today)
+                val statuses = snapshots.mapNotNull { s -> s.status?.let { s.cardId to it } }.toMap()
+                val appDebts = snapshots.associate { it.cardId to debtTotal(it.estimate, it.status) }
                 val payments = statuses.filterValues { it.paidAmount > 0 }
                     .mapValues { (cardId, status) -> repo.cardPayments(cardId, status.cutoffDate) }
+                // Si la tabla aún no existe en el servidor, la pantalla sigue funcionando sin la conciliación.
+                val checks = runCatching { repo.balanceChecks() }.getOrDefault(emptyList())
+                    .groupBy { it.cardId }.mapValues { (_, list) -> list.first() }
                 _state.update {
                     it.copy(
                         cards = active, archived = archived, spend = spend, statuses = statuses,
-                        payments = payments, loading = false,
+                        payments = payments, appDebts = appDebts, balanceChecks = checks, loading = false,
                     )
                 }
             } catch (e: CancellationException) {
@@ -220,6 +234,35 @@ class CardsViewModel(
     }
 
     fun consumePaymentSaved() = _state.update { it.copy(paymentSaved = false, paymentError = null) }
+
+    /** Guarda el saldo utilizado que muestra el banco hoy para una tarjeta propia; sirve para conciliar. */
+    fun saveBalanceCheck(card: Card, text: String) {
+        if (card.ownerId != userId) return
+        val balance = parseBankBalance(text)
+        if (balance == null) {
+            _state.update { it.copy(balanceError = "Escribe el saldo que muestra el banco (puede ser 0)", balanceSaved = false) }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repo.addBalanceCheck(
+                    NewCardBalanceCheck(
+                        householdId = householdId, ownerId = userId, cardId = card.id,
+                        bankBalance = balance, checkedOn = today,
+                    ),
+                )
+                _state.update { it.copy(balanceError = null, balanceSaved = true) }
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // El error se muestra dentro del diálogo abierto: arriba de la pantalla quedaría detrás de él.
+                _state.update { it.copy(balanceError = userMessage(e), balanceSaved = false) }
+            }
+        }
+    }
+
+    fun consumeBalanceSaved() = _state.update { it.copy(balanceSaved = false, balanceError = null) }
 
     /** `amount` null quita el presupuesto. Un monto cero o negativo se rechaza antes de llegar al servidor. */
     fun setBudget(id: String, amount: Double?) {

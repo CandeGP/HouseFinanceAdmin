@@ -2,6 +2,7 @@ package mx.finanzas.pareja.domain
 
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
 import kotlinx.datetime.plus
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayStatus
@@ -19,13 +20,20 @@ data class NextPayment(
     val fromClosedCycle: Boolean,
     val overdue: Boolean,
     val paidClosedCycle: Boolean,
+    /** Días de hoy a la fecha límite; negativo si ya venció. */
+    val daysUntilDue: Int = 0,
 )
 
 /** Todo lo que se debe pagar de una tarjeta: el corte cerrado sin pagar (si lo hay) y el ciclo abierto. */
 fun paymentObligations(view: CardCycleView, status: CardCycleStatus?, today: LocalDate): List<NextPayment> {
     val unpaid = status.unpaidAmount
     val closed = if (status != null && unpaid > 0) {
-        listOf(NextPayment(unpaid, status.dueDate, fromClosedCycle = true, overdue = status.dueDate < today, paidClosedCycle = false))
+        listOf(
+            NextPayment(
+                unpaid, status.dueDate, fromClosedCycle = true, overdue = status.dueDate < today, paidClosedCycle = false,
+                daysUntilDue = today.daysUntil(status.dueDate),
+            ),
+        )
     } else emptyList()
     val open = NextPayment(
         amount = view.estimate.cycleTotal,
@@ -33,6 +41,7 @@ fun paymentObligations(view: CardCycleView, status: CardCycleStatus?, today: Loc
         fromClosedCycle = false,
         overdue = false,
         paidClosedCycle = status?.status == CardPayStatus.PAID && status.targetAmount > 0,
+        daysUntilDue = today.daysUntil(view.estimate.dueDate),
     )
     return closed + open
 }
@@ -41,16 +50,37 @@ fun paymentObligations(view: CardCycleView, status: CardCycleStatus?, today: Loc
 fun nextPayment(view: CardCycleView, status: CardCycleStatus?, today: LocalDate): NextPayment =
     paymentObligations(view, status, today).first()
 
-/** Una sola línea con la fecha: sin repetir montos. */
+/** "hoy", "mañana", "en 5 días" o "hace 3 días". */
+fun relativeDays(days: Int): String = when {
+    days == 0 -> "hoy"
+    days == 1 -> "mañana"
+    days == -1 -> "ayer"
+    days > 1 -> "en $days días"
+    else -> "hace ${-days} días"
+}
+
+/** Una sola línea con la fecha y cuánto falta: sin repetir montos. */
 fun NextPayment.dueLine(): String {
     val due = formatDayMonthEs(dueDate)
+    val `when` = relativeDays(daysUntilDue)
     return when {
-        overdue -> "Vencido el $due"
-        fromClosedCycle -> "Vence $due"
-        paidClosedCycle -> "Pagado ✓ · siguiente pago vence $due"
-        else -> "Siguiente pago vence $due"
+        overdue -> "Vencido el $due ($`when`)"
+        fromClosedCycle -> "Vence $due ($`when`)"
+        paidClosedCycle -> "Pagado ✓ · siguiente pago vence $due ($`when`)"
+        else -> "Siguiente pago vence $due ($`when`)"
     }
 }
+
+/**
+ * Tarjetas en orden de lo que urge: primero las que tienen algo por pagar, de la fecha más cercana (o ya
+ * vencida) a la más lejana; al final las que no deben nada por ahora.
+ */
+fun sortByDue(ranking: List<CardRank>, payments: Map<String, NextPayment>): List<CardRank> =
+    ranking.sortedWith(
+        compareBy<CardRank> { (payments[it.view.card.id]?.amount ?: 0.0) <= 0 }
+            .thenBy { payments[it.view.card.id]?.dueDate ?: LocalDate(9999, 12, 31) }
+            .thenByDescending { payments[it.view.card.id]?.amount ?: 0.0 },
+    )
 
 /** [overdue] es la parte de [total] que ya venció y sigue sin pagarse. */
 data class Quincena(val total: Double, val cards: Int, val overdue: Double = 0.0)

@@ -14,7 +14,6 @@ import kotlinx.datetime.minus
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.Transaction
-import mx.finanzas.pareja.data.cycleStatuses
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardCycleView
 import mx.finanzas.pareja.domain.DashboardSummary
@@ -69,14 +68,15 @@ class DashboardViewModel(
             _state.update { it.copy(loading = true, error = null) }
             try {
                 val ref = today()
-                allViews = repo.cards()
-                    .filterNot { it.archived }
-                    .mapNotNull { card -> repo.cycleEstimate(card.id, ref)?.let { CardCycleView(card, it) } }
+                val cards = repo.cards().filterNot { it.archived }
+                // Una sola consulta para todas las tarjetas (estimación del ciclo y estado de pago).
+                val snapshots = repo.cardSnapshots(cards.map { it.id }, ref).associateBy { it.cardId }
+                allViews = cards.mapNotNull { card -> snapshots[card.id]?.estimate?.let { CardCycleView(card, it) } }
                 val pending = runCatching { repo.pendingTransactions().count { it.ownerId == userId } }
                     .getOrDefault(0)
                 // Un mes más que la ventana de detección, para no perder el primer cargo del límite.
                 allTransactions = repo.transactions(ref.minus(RECURRING_LOOKBACK_MONTHS + 1, DateTimeUnit.MONTH), ref)
-                val statuses = repo.cycleStatuses(allViews.map { it.card.id }, ref)
+                val statuses = allViews.mapNotNull { view -> snapshots[view.card.id]?.status?.let { view.card.id to it } }.toMap()
                 _state.update { it.copy(pendingCount = pending, statuses = statuses) }
                 publish(loading = false)
             } catch (e: CancellationException) {

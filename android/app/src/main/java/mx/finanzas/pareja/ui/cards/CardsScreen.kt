@@ -94,6 +94,7 @@ fun CardsScreen(
         mutableStateOf<Triple<mx.finanzas.pareja.data.Card, CardCycleStatus, CardPayment>?>(null)
     }
     var pendingDeletePayment by remember { mutableStateOf<CardPayment?>(null) }
+    var balanceFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     val zone = remember { TimeZone.currentSystemDefault() }
     val today = remember { Clock.System.todayIn(zone) }
 
@@ -103,6 +104,13 @@ fun CardsScreen(
             editPayment = null
             vm.consumePaymentSaved()
             onChanged()
+        }
+    }
+
+    LaunchedEffect(state.balanceSaved) {
+        if (state.balanceSaved) {
+            balanceFor = null
+            vm.consumeBalanceSaved()
         }
     }
 
@@ -209,6 +217,12 @@ fun CardsScreen(
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                     BudgetLine(card = card, spend = spend, mine = mine)
+                                    BalanceCheckLine(
+                                        appDebt = state.appDebts[card.id],
+                                        check = state.balanceChecks[card.id],
+                                        mine = mine,
+                                        onCapture = { balanceFor = card },
+                                    )
                                     state.statuses[card.id]?.let { status ->
                                         PayStatusText(status, Modifier.padding(top = 6.dp))
                                         state.payments[card.id].orEmpty().forEach { payment ->
@@ -343,6 +357,16 @@ fun CardsScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { pendingDeletePayment = null }) { Text("Cancelar") } },
+        )
+    }
+
+    balanceFor?.let { card ->
+        BalanceCheckDialog(
+            card = card,
+            appDebt = state.appDebts[card.id],
+            error = state.balanceError,
+            onDismiss = { balanceFor = null; vm.consumeBalanceSaved() },
+            onSave = { text -> vm.saveBalanceCheck(card, text) },
         )
     }
 

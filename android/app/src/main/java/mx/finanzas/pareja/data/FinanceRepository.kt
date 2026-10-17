@@ -75,6 +75,14 @@ interface FinanceRepository {
     suspend fun restoreCard(id: String)
     suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate?
 
+    /** Capturas del saldo del banco, la más reciente primero. */
+    suspend fun balanceChecks(): List<CardBalanceCheck>
+    suspend fun addBalanceCheck(check: NewCardBalanceCheck)
+
+    /** Estimación y estado de pago de varias tarjetas. La versión de Supabase lo trae en una sola consulta. */
+    suspend fun cardSnapshots(cardIds: List<String>, ref: LocalDate): List<CardSnapshot> =
+        snapshotsOneByOne(cardIds, ref)
+
     /** Gasto del mes calendario de [ref] frente al presupuesto de la tarjeta. */
     suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend?
 

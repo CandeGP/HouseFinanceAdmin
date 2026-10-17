@@ -30,9 +30,10 @@ import mx.finanzas.pareja.domain.Quincena
 import mx.finanzas.pareja.domain.QuincenaTotals
 import mx.finanzas.pareja.domain.RecurringCharge
 import mx.finanzas.pareja.domain.dueLine
+import mx.finanzas.pareja.domain.sortByDue
 import mx.finanzas.pareja.domain.formatDayMonthEs
 import mx.finanzas.pareja.domain.formatMxn
-import mx.finanzas.pareja.domain.unpaidAmount
+import mx.finanzas.pareja.domain.debtTotal
 import mx.finanzas.pareja.ui.components.CardChip
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
@@ -92,7 +93,7 @@ fun DashboardScreen(
             ) {
                 item { QuincenaCards(state.quincenas) }
                 if (state.recurring.isNotEmpty()) item { RecurringCard(state.recurring) }
-                items(state.summary.ranking, key = { it.view.card.id }) { rank ->
+                items(sortByDue(state.summary.ranking, state.nextPayments), key = { it.view.card.id }) { rank ->
                     CardRankItem(
                         rank,
                         ownerName = memberNames[rank.view.card.ownerId],
@@ -212,7 +213,7 @@ private fun CardRankItem(rank: CardRank, ownerName: String?, payment: NextPaymen
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
-                    Text("#${rank.rank} ${card.name}", style = MaterialTheme.typography.titleMedium)
+                    Text(card.name, style = MaterialTheme.typography.titleMedium)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -240,7 +241,7 @@ private fun CardRankItem(rank: CardRank, ownerName: String?, payment: NextPaymen
             payment?.let { Text(it.dueLine(), style = MaterialTheme.typography.bodyMedium) }
             // Deuda total: corte anterior sin pagar + ciclo abierto + meses sin intereses que faltan.
             Text(
-                "Debes en total: ${formatMxn(status.unpaidAmount + est.cycleTotal + est.msiRemaining)}",
+                "Debes en total: ${formatMxn(debtTotal(est, status))}",
                 style = MaterialTheme.typography.titleSmall,
             )
             if (status?.status == CardPayStatus.UNTRACKED) {

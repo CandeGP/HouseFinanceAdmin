@@ -23,7 +23,7 @@ class NextPaymentsTest {
         assertEquals(2010.97, next.amount, 0.0)
         assertEquals(LocalDate(2026, 10, 25), next.dueDate)
         assertTrue(next.fromClosedCycle)
-        assertEquals("Vence 25 oct", next.dueLine())
+        assertEquals("Vence 25 oct (en 9 días)", next.dueLine())
     }
 
     @Test
@@ -36,7 +36,7 @@ class NextPaymentsTest {
     fun `pasada la fecha limite se marca vencido`() {
         val next = nextPayment(view, cycleStatus(CardPayStatus.OVERDUE, target = 500.0), LocalDate(2026, 10, 30))
         assertTrue(next.overdue)
-        assertEquals("Vencido el 25 oct", next.dueLine())
+        assertEquals("Vencido el 25 oct (hace 5 días)", next.dueLine())
     }
 
     @Test
@@ -46,14 +46,58 @@ class NextPaymentsTest {
         assertEquals(2278.48, next.amount, 0.0)
         assertEquals(LocalDate(2026, 11, 5), next.dueDate)
         assertFalse(next.fromClosedCycle)
-        assertEquals("Pagado ✓ · siguiente pago vence 5 nov", next.dueLine())
+        assertEquals("Pagado ✓ · siguiente pago vence 5 nov (en 20 días)", next.dueLine())
     }
 
     @Test
     fun `sin registro de pagos no se inventa una deuda del corte anterior`() {
         val next = nextPayment(view, cycleStatus(CardPayStatus.UNTRACKED, target = 1408.0), today)
         assertEquals(2278.48, next.amount, 0.0)
-        assertEquals("Siguiente pago vence 5 nov", next.dueLine())
+        assertEquals("Siguiente pago vence 5 nov (en 20 días)", next.dueLine())
+    }
+
+    @Test
+    fun `los dias se dicen como una persona`() {
+        assertEquals("hoy", relativeDays(0))
+        assertEquals("mañana", relativeDays(1))
+        assertEquals("ayer", relativeDays(-1))
+        assertEquals("en 7 días", relativeDays(7))
+        assertEquals("hace 3 días", relativeDays(-3))
+    }
+
+    private fun rank(id: String) = CardRank(CardCycleView(card(id), estimate(cycleTotal = 100.0)), rank = 1, sharePct = 0.0)
+
+    private fun due(amount: Double, day: Int, month: Int = 10) =
+        NextPayment(amount, LocalDate(2026, month, day), fromClosedCycle = true, overdue = false, paidClosedCycle = false)
+
+    @Test
+    fun `las tarjetas se ordenan por la fecha limite mas cercana`() {
+        val order = sortByDue(
+            listOf(rank("lejos"), rank("vencida"), rank("pronto")),
+            mapOf("lejos" to due(500.0, 5, 11), "vencida" to due(80.0, 10), "pronto" to due(300.0, 21)),
+        ).map { it.view.card.id }
+
+        assertEquals(listOf("vencida", "pronto", "lejos"), order)
+    }
+
+    @Test
+    fun `las que no deben nada van al final aunque venzan antes`() {
+        val order = sortByDue(
+            listOf(rank("cero"), rank("debe")),
+            mapOf("cero" to due(0.0, 17), "debe" to due(200.0, 28)),
+        ).map { it.view.card.id }
+
+        assertEquals(listOf("debe", "cero"), order)
+    }
+
+    @Test
+    fun `con la misma fecha va primero la que mas debe`() {
+        val order = sortByDue(
+            listOf(rank("poco"), rank("mucho")),
+            mapOf("poco" to due(50.0, 26), "mucho" to due(900.0, 26)),
+        ).map { it.view.card.id }
+
+        assertEquals(listOf("mucho", "poco"), order)
     }
 
     private fun pay(amount: Double, due: LocalDate) =

@@ -167,12 +167,73 @@ class ReconciliationTest {
     }
 
     @Test
+    fun `el original reconstruido con centavos de redondeo todavia concilia`() {
+        // Banamex solo da la mensualidad: 185.44 × 9 = 1,668.96, y la compra se capturó como 1,669.00.
+        val msi = appTx("tt", "TikTok", 1669.0, 9).copy(
+            occurredAt = LocalDate(2026, 9, 9), paymentMode = PaymentMode.MSI, installments = 9, installmentNumber = 1,
+        )
+        val inferred = statementInstallment("D LOCAL TIK TOK SHOP", 1668.96).copy(current = 1, total = 9)
+
+        val r = reconcile(statement(emptyList(), listOf(inferred)), listOf(msi))
+
+        assertEquals("tt", r.matchedInstallments.single().transaction.id)
+        assertTrue(r.missingInstallments.isEmpty())
+    }
+
+    @Test
     fun `una compra a meses sin registro queda como faltante`() {
         val r = reconcile(
             statement(emptyList(), listOf(statementInstallment("TIENDA EJEMPLO LEON", 2034.0))),
             emptyList(),
         )
         assertEquals(1, r.missingInstallments.size)
+    }
+
+    // ------------------------------------------------------------ devoluciones
+    @Test
+    fun `una compra y su devolucion en el mismo estado se cancelan y no se importan`() {
+        val r = reconcile(
+            statement(listOf(mv(14, "GUESS", 2580.0), mv(14, "GUESS", -2580.0), mv(15, "CAFFENIO", 90.0))),
+            emptyList(),
+        )
+
+        assertEquals(listOf("CAFFENIO"), r.missingInApp.map { it.description })
+        assertEquals(2580.0, r.refunded.single().charge.amount, 0.0)
+        assertTrue(r.refundsWithoutCharge.isEmpty())
+    }
+
+    @Test
+    fun `si la compra devuelta ya estaba en la app se avisa y no se reporta como faltante`() {
+        val r = reconcile(
+            statement(listOf(mv(14, "GUESS", 2990.0), mv(14, "GUESS", -2990.0))),
+            listOf(appTx("guess", "Guess", 2990.0, 14)),
+        )
+
+        assertEquals(listOf("guess"), r.refundedInApp.map { it.id })
+        assertTrue(r.notInStatement.isEmpty())
+        assertTrue(r.missingInApp.isEmpty())
+    }
+
+    @Test
+    fun `una devolucion de otra compra queda aparte y no se confunde con un pago`() {
+        val r = reconcile(
+            statement(listOf(mv(10, "TIENDA UNO", -400.0), mv(12, "PAGO POR SPEI", -1000.0))),
+            emptyList(),
+        )
+
+        assertEquals(listOf("TIENDA UNO"), r.refundsWithoutCharge.map { it.description })
+        assertTrue(r.refunded.isEmpty())
+    }
+
+    @Test
+    fun `una devolucion de otro comercio o de otro monto no cancela la compra`() {
+        val r = reconcile(
+            statement(listOf(mv(14, "GUESS", 2580.0), mv(14, "OXXO", -2580.0), mv(15, "GUESS", -100.0))),
+            emptyList(),
+        )
+
+        assertEquals(listOf("GUESS"), r.missingInApp.map { it.description })
+        assertEquals(2, r.refundsWithoutCharge.size)
     }
 
     // ------------------------------------------------------------ similitud

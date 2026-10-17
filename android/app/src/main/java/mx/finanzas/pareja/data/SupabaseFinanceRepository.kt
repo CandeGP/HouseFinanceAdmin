@@ -163,6 +163,29 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
             },
         ).decodeList<CycleEstimate>().firstOrNull()
 
+    override suspend fun balanceChecks(): List<CardBalanceCheck> =
+        client.postgrest.from("card_balance_checks").select {
+            order("checked_on", Order.DESCENDING)
+            order("created_at", Order.DESCENDING)
+        }.decodeList<CardBalanceCheck>()
+
+    override suspend fun addBalanceCheck(check: NewCardBalanceCheck) {
+        client.postgrest.from("card_balance_checks").insert(check)
+    }
+
+    override suspend fun cardSnapshots(cardIds: List<String>, ref: LocalDate): List<CardSnapshot> =
+        try {
+            client.postgrest.rpc(
+                "card_snapshots",
+                buildJsonObject { put("p_ref", ref.toString()) },
+            ).decodeList<CardSnapshotRow>().filter { it.cardId in cardIds }.map { it.toSnapshot() }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Si la función aún no está en el servidor (migración pendiente), el Resumen sigue funcionando.
+            snapshotsOneByOne(cardIds, ref)
+        }
+
     override suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend? =
         client.postgrest.rpc(
             "card_month_spend",

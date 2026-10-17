@@ -83,6 +83,7 @@ private fun detectBank(text: String): String? = when {
     text.contains("BBVA", ignoreCase = true) -> "BBVA"
     Regex("""Tarjeta de Cr[eé]dito Nu\b""", RegexOption.IGNORE_CASE).containsMatchIn(text) -> "Nu"
     text.contains("Santander", ignoreCase = true) -> "Santander"
+    text.contains("Banamex", ignoreCase = true) -> "Banamex"
     else -> null
 }
 
@@ -156,6 +157,9 @@ private val INSTALLMENT_HINT = Regex("""(?i)(^\d{1,2}\s+DE\s+\d{1,2}\b|\bA\s+(?:
 private val DIGITAL_CARD_SUFFIX = Regex("""\s*;\s*Tarjeta\s+(?:digital|virtual).*$""", RegexOption.IGNORE_CASE)
 private val INSTALLMENT_SUFFIX = Regex("""\s+-\s*\d{1,2}/\d{1,2}$""")
 
+// Banamex lista cada mensualidad como un cargo más: "MERCADO PAGO 011 de 012" o "TIK TOK SHOP (2 de 9)".
+private val TRAILING_INSTALLMENT = Regex("""\s*\(?\b(\d{1,3})\s+de\s+(\d{1,3})\b\)?\s*$""", RegexOption.IGNORE_CASE)
+
 // Primera mitad de una descripción partida en dos renglones: solo mayúsculas y espacios.
 private val WRAPPED_DESCRIPTION_HEAD = Regex("""^[A-ZÁÉÍÓÚÑ ]{4,40}$""")
 
@@ -168,6 +172,7 @@ private fun cleanDescription(raw: String): String =
         .replace(RFC_SUFFIX, "")
         .replace(DIGITAL_CARD_SUFFIX, "")
         .replace(INSTALLMENT_SUFFIX, "")
+        .replace(TRAILING_INSTALLMENT, "")
         .replace(Regex("""^[|\s]+"""), "")
         .replace(Regex("""^1VA\b"""), "IVA") // OCR: la I de IVA leída como 1
         .replace(Regex("""\s+"""), " ")
@@ -202,6 +207,7 @@ fun parseStatement(rawText: String): ParsedStatement? {
 
     val movements = mutableListOf<StatementMovement>()
     val installments = mutableListOf<StatementInstallment>()
+    val fromCharges = mutableListOf<Triple<StatementMovement, Int, Int>>()
     var previousLine = ""
 
     for (rawLine in text.lines()) {
@@ -246,16 +252,22 @@ fun parseStatement(rawText: String): ParsedStatement? {
                 EMBEDDED_CARD.find(description)?.let { card = card ?: it.groupValues[1] }
                 val cleaned = cleanDescription(description)
                 val negative = mv.groupValues[4] in NEGATIVE_SIGNS
-                movements += StatementMovement(
+                // La pista se busca antes de limpiar: la limpieza quita "- 2/6", "011 de 012" y "; Tarjeta digital".
+                val hintText = description.replace(RFC_SUFFIX, "").trim()
+                val tail = if (negative) null else TRAILING_INSTALLMENT.find(hintText)
+                val tailCurrent = tail?.groupValues?.get(1)?.toInt()
+                val tailTotal = tail?.groupValues?.get(2)?.toInt()
+                val isTailInstallment = tailCurrent != null && tailTotal != null && tailTotal >= 2 && tailCurrent in 1..tailTotal
+                val movement = StatementMovement(
                     operationDate = operation,
                     chargeDate = parseStatementDate(mv.groupValues[2]),
                     description = cleaned,
                     amount = if (negative) -amountAbs else amountAbs,
                     cardLast4 = card,
-                    // La pista se busca antes de limpiar: la limpieza quita "- 2/6" y "; Tarjeta digital".
-                    isInstallmentCharge = !negative &&
-                        INSTALLMENT_HINT.containsMatchIn(description.replace(RFC_SUFFIX, "").trim()),
+                    isInstallmentCharge = !negative && (INSTALLMENT_HINT.containsMatchIn(hintText) || isTailInstallment),
                 )
+                movements += movement
+                if (isTailInstallment) fromCharges += Triple(movement, tailCurrent!!, tailTotal!!)
             }
             continue
         }
@@ -269,5 +281,33 @@ fun parseStatement(rawText: String): ParsedStatement? {
         }
     }
 
-    return ParsedStatement(summary, markInstallmentCharges(movements, installments), installments)
+    val all = installments + inferInstallments(fromCharges, installments)
+    return ParsedStatement(summary, markInstallmentCharges(movements, all), all)
 }
+
+/**
+ * Cuando el banco no trae tabla de compras a meses (Banamex) y solo lista cada mensualidad como cargo
+ * ("... 02 de 09"), la compra se reconstruye: monto original = mensualidad × meses.
+ * shortcut: sin intereses ni redondeo del banco, se afina si algún estado trae la tabla real.
+ */
+private fun inferInstallments(
+    charges: List<Triple<StatementMovement, Int, Int>>,
+    table: List<StatementInstallment>,
+): List<StatementInstallment> = charges
+    .filter { (movement, _, _) ->
+        table.none { i ->
+            abs(i.requiredPayment - movement.amount) < AMOUNT_EPSILON &&
+                words(i.description).intersect(words(movement.description)).isNotEmpty()
+        }
+    }
+    .map { (movement, current, total) ->
+        StatementInstallment(
+            purchaseDate = movement.operationDate,
+            description = movement.description,
+            originalAmount = Math.round(movement.amount * total * 100) / 100.0,
+            pendingBalance = Math.round(movement.amount * (total - current) * 100) / 100.0,
+            requiredPayment = movement.amount,
+            current = current,
+            total = total,
+        )
+    }

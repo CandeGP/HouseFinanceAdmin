@@ -2,6 +2,8 @@ package mx.finanzas.pareja
 
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import mx.finanzas.pareja.data.CardBalanceCheck
+import mx.finanzas.pareja.data.NewCardBalanceCheck
 import mx.finanzas.pareja.data.ManualPayment
 import mx.finanzas.pareja.data.ManualPaymentPatch
 import mx.finanzas.pareja.data.NewManualPayment
@@ -171,6 +173,22 @@ class FakeFinanceRepository : FinanceRepository {
     }
 
     override suspend fun cycleEstimate(cardId: String, ref: LocalDate): CycleEstimate? = estimates[cardId]
+
+    var balanceCheckList: MutableList<CardBalanceCheck> = mutableListOf()
+    val addedBalanceChecks = mutableListOf<NewCardBalanceCheck>()
+
+    override suspend fun balanceChecks(): List<CardBalanceCheck> = balanceCheckList.sortedByDescending { it.checkedOn }
+
+    var balanceCheckFailWith: Exception? = null
+
+    override suspend fun addBalanceCheck(check: NewCardBalanceCheck) {
+        balanceCheckFailWith?.let { throw it }
+        addedBalanceChecks += check
+        balanceCheckList += CardBalanceCheck(
+            id = "bc${addedBalanceChecks.size}", householdId = check.householdId, ownerId = check.ownerId,
+            cardId = check.cardId, bankBalance = check.bankBalance, checkedOn = check.checkedOn,
+        )
+    }
 
     override suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend? = monthSpends[cardId]
 
