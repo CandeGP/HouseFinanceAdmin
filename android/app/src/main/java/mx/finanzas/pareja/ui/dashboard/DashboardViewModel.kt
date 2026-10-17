@@ -18,6 +18,11 @@ import mx.finanzas.pareja.data.cycleStatuses
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.CardCycleView
 import mx.finanzas.pareja.domain.DashboardSummary
+import mx.finanzas.pareja.domain.NO_QUINCENAS
+import mx.finanzas.pareja.domain.NextPayment
+import mx.finanzas.pareja.domain.QuincenaTotals
+import mx.finanzas.pareja.domain.nextPayment
+import mx.finanzas.pareja.domain.quincenaTotals
 import mx.finanzas.pareja.domain.RECURRING_LOOKBACK_MONTHS
 import mx.finanzas.pareja.domain.RecurringCharge
 import mx.finanzas.pareja.domain.detectRecurring
@@ -37,6 +42,10 @@ data class DashboardUiState(
     val statuses: Map<String, CardCycleStatus> = emptyMap(),
     /** Cargos que se repiten cada mes y se esperan pronto (suscripciones, servicios, renta). */
     val recurring: List<RecurringCharge> = emptyList(),
+    /** Lo que toca pagar de cada tarjeta (por id) y cuándo. */
+    val nextPayments: Map<String, NextPayment> = emptyMap(),
+    /** Lo que vence este mes, separado por quincena de la fecha de pago. */
+    val quincenas: QuincenaTotals = NO_QUINCENAS,
 )
 
 class DashboardViewModel(
@@ -87,11 +96,17 @@ class DashboardViewModel(
         val visible = if (scope == Scope.MINE) allViews.filter { it.card.ownerId == userId } else allViews
         val visibleTransactions =
             if (scope == Scope.MINE) allTransactions.filter { it.ownerId == userId } else allTransactions
+        val now = today()
+        val payments = visible.associate { view ->
+            view.card.id to nextPayment(view, _state.value.statuses[view.card.id], now)
+        }
         _state.update {
             it.copy(
                 loading = loading,
                 summary = buildDashboard(visible),
-                recurring = detectRecurring(visibleTransactions, today()),
+                recurring = detectRecurring(visibleTransactions, now),
+                nextPayments = payments,
+                quincenas = quincenaTotals(payments.values.toList(), now),
             )
         }
     }

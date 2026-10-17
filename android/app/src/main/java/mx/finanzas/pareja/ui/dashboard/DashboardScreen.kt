@@ -21,17 +21,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.font.FontWeight
 import mx.finanzas.pareja.data.CardCycleStatus
+import mx.finanzas.pareja.data.CardPayStatus
 import mx.finanzas.pareja.domain.CardRank
+import mx.finanzas.pareja.domain.NextPayment
+import mx.finanzas.pareja.domain.Quincena
+import mx.finanzas.pareja.domain.QuincenaTotals
 import mx.finanzas.pareja.domain.RecurringCharge
-import mx.finanzas.pareja.domain.formatDateEs
+import mx.finanzas.pareja.domain.dueLine
 import mx.finanzas.pareja.domain.formatDayMonthEs
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.domain.unpaidAmount
 import mx.finanzas.pareja.ui.components.CardChip
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
-import mx.finanzas.pareja.ui.components.PayStatusText
 import mx.finanzas.pareja.ui.components.ScopeToggle
 
 @Composable
@@ -86,12 +90,13 @@ fun DashboardScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item { TotalsCard(state.summary.totalCycle, state.summary.totalMsiRemaining, state.summary.topCard?.name) }
+                item { QuincenaCards(state.quincenas) }
                 if (state.recurring.isNotEmpty()) item { RecurringCard(state.recurring) }
                 items(state.summary.ranking, key = { it.view.card.id }) { rank ->
                     CardRankItem(
                         rank,
                         ownerName = memberNames[rank.view.card.ownerId],
+                        payment = state.nextPayments[rank.view.card.id],
                         status = state.statuses[rank.view.card.id],
                     )
                 }
@@ -100,21 +105,49 @@ fun DashboardScreen(
     }
 }
 
+/** Lo que vence este mes, en dos bloques grandes: pagos del 1 al 15 y del 16 a fin de mes. */
 @Composable
-private fun TotalsCard(totalCycle: Double, msiRemaining: Double, topCardName: String?) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        ),
-    ) {
+private fun QuincenaCards(totals: QuincenaTotals) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        QuincenaCard(
+            "A pagar 1ª quincena", "Vence del 1 al 15", totals.first,
+            MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer,
+            Modifier.weight(1f),
+        )
+        QuincenaCard(
+            "A pagar 2ª quincena", "Vence del 16 a fin de mes", totals.second,
+            MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer,
+            Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun QuincenaCard(
+    title: String,
+    range: String,
+    quincena: Quincena,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+    modifier: Modifier,
+) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = container, contentColor = content)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("A pagar este ciclo (estimado)", style = MaterialTheme.typography.labelLarge)
-            Text(formatMxn(totalCycle), style = MaterialTheme.typography.headlineMedium)
-            Text("MSI pendiente por pagar: ${formatMxn(msiRemaining)}", style = MaterialTheme.typography.bodyMedium)
-            if (topCardName != null) {
-                Text("Tarjeta con más gasto: $topCardName", style = MaterialTheme.typography.bodyMedium)
-            }
+            Text(title, style = MaterialTheme.typography.labelLarge)
+            Text(
+                formatMxn(quincena.total),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            )
+            Text(range, style = MaterialTheme.typography.bodySmall)
+            Text(
+                when (quincena.cards) {
+                    0 -> "Nada pendiente"
+                    1 -> "1 tarjeta"
+                    else -> "${quincena.cards} tarjetas"
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }
@@ -161,7 +194,7 @@ private fun RecurringCard(charges: List<RecurringCharge>) {
 }
 
 @Composable
-private fun CardRankItem(rank: CardRank, ownerName: String?, status: CardCycleStatus?) {
+private fun CardRankItem(rank: CardRank, ownerName: String?, payment: NextPayment?, status: CardCycleStatus?) {
     val card = rank.view.card
     val est = rank.view.estimate
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -184,30 +217,22 @@ private fun CardRankItem(rank: CardRank, ownerName: String?, status: CardCycleSt
                         }
                     }
                 }
-                Text(formatMxn(est.cycleTotal), style = MaterialTheme.typography.titleMedium)
-            }
-            // Deuda total: lo del corte anterior sin pagar + lo del ciclo + los meses sin intereses que faltan.
-            val unpaid = status.unpaidAmount
-            Text(
-                "Debes en total: ${formatMxn(unpaid + est.cycleTotal + est.msiRemaining)}",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            if (unpaid > 0) {
+                // Lo que toca pagar (con el corte anterior sin pagar si lo hay), no el gasto del ciclo abierto.
                 Text(
-                    "Incluye ${formatMxn(unpaid)} del corte anterior sin pagar. Es una estimación: puede diferir " +
-                        "del saldo del banco (intereses, compras a meses ya facturadas).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    formatMxn(payment?.amount ?: est.cycleTotal),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                 )
             }
+            payment?.let { Text(it.dueLine(), style = MaterialTheme.typography.bodyMedium) }
+            // Deuda total: corte anterior sin pagar + ciclo abierto + meses sin intereses que faltan.
             Text(
-                "Corte: ${formatDateEs(est.cycleEnd)} · Pago: ${formatDateEs(est.dueDate)}",
-                style = MaterialTheme.typography.bodyMedium,
+                "Debes en total: ${formatMxn(status.unpaidAmount + est.cycleTotal + est.msiRemaining)}",
+                style = MaterialTheme.typography.titleSmall,
             )
-            status?.let { PayStatusText(it) }
-            if (est.cycleMsiTotal > 0) {
+            if (status?.status == CardPayStatus.UNTRACKED) {
                 Text(
-                    "Incluye ${formatMxn(est.cycleMsiTotal)} de mensualidades · Saldo MSI: ${formatMxn(est.msiRemaining)}",
+                    "Corte anterior sin registro de pago",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
