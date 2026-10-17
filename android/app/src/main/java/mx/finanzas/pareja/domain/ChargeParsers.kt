@@ -25,6 +25,7 @@ data class ParsedCharge(
 object ChargeSources {
     const val GOOGLE_WALLET = "com.google.android.apps.walletnfcrel"
     const val PLATA = "dif.tech.plata"
+    const val GMAIL = "com.google.android.gm"
 
     /** Paquetes de bancos/fintech conocidos (los demás se detectan por el nombre de la app). */
     private val KNOWN_PACKAGES: Set<String> = setOf(
@@ -48,8 +49,12 @@ object ChargeSources {
     /**
      * ¿Se leen las notificaciones de este paquete? El nombre visible de la app permite cubrir
      * bancos que no están en la lista sin inspeccionar apps ajenas (WhatsApp, redes, etc.).
+     * Gmail solo cuenta si el remitente (el título de la notificación) parece un banco: no se leen los demás correos.
      */
-    fun isWatched(packageName: String, appLabel: String? = null): Boolean =
+    fun isWatched(packageName: String, appLabel: String? = null, title: String? = null): Boolean =
+        if (packageName == GMAIL) title != null && BANK_LABEL.containsMatchIn(title) else isWatchedApp(packageName, appLabel)
+
+    private fun isWatchedApp(packageName: String, appLabel: String?): Boolean =
         packageName in KNOWN_PACKAGES ||
             KNOWN_PREFIXES.any { packageName.startsWith(it) } ||
             (appLabel != null && BANK_LABEL.containsMatchIn(appLabel))
@@ -88,7 +93,7 @@ private val INCOME_WORDS = Regex(
 )
 private val FOREIGN_CURRENCY = Regex("""\b(?:USD|EUR|CAD|GBP|US\$)\b""", RegexOption.IGNORE_CASE)
 private val BANK_AMOUNT = Regex("""(?:\$|MXN)\s*([\d,]+(?:\.\d{1,2})?)""", RegexOption.IGNORE_CASE)
-private val MERCHANT_AFTER_EN = Regex("""\ben\s+(.+?)(?=\s+con\b|\s+el\b|\s+a\s+las\b|\s+de\s+tu\b|[.,;]|$)""", RegexOption.IGNORE_CASE)
+private val MERCHANT_AFTER_EN = Regex("""\ben\s+(.+?)(?=\s+con\b|\s+terminad[ao]\b|\s+terminaci[oó]n\b|\s+el\b|\s+a\s+las\b|\s+de\s+tu\b|[.,;]|$)""", RegexOption.IGNORE_CASE)
 // "ENERGETICOS ALTIPLANO usó $219.08 para pre-autorizar…" (aviso de Rappi): el comercio va antes de "usó".
 private val MERCHANT_BEFORE_USO = Regex("""^(.+?)\s+us[oó]\s+(?:\$|MXN)""", RegexOption.IGNORE_CASE)
 private val LAST4 = Regex(

@@ -96,6 +96,7 @@ const LINKS = [
   { href: "/", label: "Resumen" },
   { href: "/gastos", label: "Gastos" },
   { href: "/tarjetas", label: "Tarjetas" },
+  { href: "/meses", label: "Compras a meses" },
 ];
 
 function Workspace({ uid, children }: { uid: string; children: ReactNode }) {

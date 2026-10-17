@@ -47,6 +47,7 @@ fun DashboardScreen(
     onAddCard: () -> Unit,
     onOpenInbox: () -> Unit,
     onOpenInstallments: () -> Unit,
+    onOpenDuplicates: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(refreshKey) { if (refreshKey > 0) vm.load() }
@@ -94,6 +95,7 @@ fun DashboardScreen(
             ) {
                 item { QuincenaCards(state.quincenas) }
                 item { InstallmentsEntry(onOpenInstallments) }
+                item { DuplicatesEntry(onOpenDuplicates) }
                 if (state.recurring.isNotEmpty()) item { RecurringCard(state.recurring) }
                 items(sortByDue(state.summary.ranking, state.nextPayments), key = { it.view.card.id }) { rank ->
                     CardRankItem(
@@ -116,6 +118,21 @@ private fun InstallmentsEntry(onOpen: () -> Unit) {
             Text("Compras a meses", style = MaterialTheme.typography.titleSmall)
             Text(
                 "Mira cuánto pagarás de mensualidades en los próximos meses",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Acceso a los cargos que parecen registrados dos veces. */
+@Composable
+private fun DuplicatesEntry(onOpen: () -> Unit) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Posibles duplicados", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Revisa cargos que parecen registrados dos veces",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

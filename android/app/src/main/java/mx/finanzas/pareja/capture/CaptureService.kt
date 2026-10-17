@@ -36,10 +36,10 @@ class CaptureService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val extras = sbn.notification.extras
-        if (!ChargeSources.isWatched(sbn.packageName, appLabel(extras))) return
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        if (!ChargeSources.isWatched(sbn.packageName, appLabel(extras), title)) return
         if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()
         val app = application as FinanzasApp
@@ -88,7 +88,7 @@ object CaptureSync {
                 amount = charge.amount,
                 capturedAt = charge.capturedAt,
                 cardLast4 = charge.cardLast4,
-                source = TxSource.NOTIFICATION,
+                source = if (charge.sourcePackage == ChargeSources.GMAIL) TxSource.EMAIL else TxSource.NOTIFICATION,
                 raw = charge.raw,
             )
             ingested += charge to result

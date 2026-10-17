@@ -108,6 +108,16 @@ class BankChargeParserTest {
     }
 
     @Test
+    fun `correo de un banco por Gmail se parsea como cobro`() {
+        val c = parseCharge(
+            RawNotification(ChargeSources.GMAIL, "BBVA México", "Compra aprobada por \$250.00 en OXXO terminación 1234", at),
+        )!!
+        assertEquals(250.0, c.amount, 0.001)
+        assertEquals("OXXO", c.merchant)
+        assertEquals("1234", c.cardLast4)
+    }
+
+    @Test
     fun `reconoce bancos por paquete conocido o por nombre de la app`() {
         assertTrue(ChargeSources.isWatched("com.bancomer.mbanking"))
         assertTrue(ChargeSources.isWatched("com.nu.production"))
@@ -115,5 +125,8 @@ class BankChargeParserTest {
         assertTrue(ChargeSources.isWatched("com.x.y", appLabel = "HSBC México"))
         assertFalse(ChargeSources.isWatched("com.whatsapp", appLabel = "WhatsApp"))
         assertFalse(ChargeSources.isWatched("com.spotify.music", appLabel = "Spotify"))
+        assertTrue(ChargeSources.isWatched(ChargeSources.GMAIL, appLabel = "Gmail", title = "BBVA México"))
+        assertFalse(ChargeSources.isWatched(ChargeSources.GMAIL, appLabel = "Gmail", title = "Mamá"))
+        assertFalse(ChargeSources.isWatched(ChargeSources.GMAIL, appLabel = "Gmail"))
     }
 }

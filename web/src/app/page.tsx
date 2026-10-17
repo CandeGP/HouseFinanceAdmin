@@ -1,12 +1,29 @@
 "use client";
 
+import Link from "next/link";
 import { useFinance } from "@/components/Shell";
 import { Bar, Card, CardChip, PageTitle, Stat, Tag } from "@/components/ui";
 import { cardAccent, cardLabel } from "@/lib/cards";
-import { currentMonth, dayLabel, monthKey, monthLabel, mxn } from "@/lib/format";
+import { currentMonth, dayLabel, monthKey, monthLabel, mxn, todayIso } from "@/lib/format";
+import { paymentObligations, quincenaTotals, type Quincena } from "@/lib/plan";
 
 const TOP_CATEGORIES = 5;
 const RECENT = 8;
+
+/** Lo que vence en una quincena: total grande, rango y cuántas tarjetas, con lo vencido aparte. */
+function QuincenaCard({ title, range, quincena, highlight }: { title: string; range: string; quincena: Quincena; highlight?: boolean }) {
+  return (
+    <div className={`rounded-xl p-6 shadow-card ${highlight ? "bg-voltage text-on-voltage" : "bg-card"}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.04em]">{title}</p>
+      <p className="mt-3 text-4xl font-bold tracking-[-0.05em]">{mxn(quincena.total)}</p>
+      <p className="mt-2 text-sm">{range}</p>
+      <p className="text-sm opacity-80">
+        {quincena.cards === 0 ? "Nada pendiente" : quincena.cards === 1 ? "1 tarjeta" : `${quincena.cards} tarjetas`}
+      </p>
+      {quincena.overdue > 0 ? <p className="mt-1 text-sm font-semibold">Incluye {mxn(quincena.overdue)} vencido</p> : null}
+    </div>
+  );
+}
 
 export default function Resumen() {
   const { finance, uid, scope } = useFinance();
@@ -23,6 +40,11 @@ export default function Resumen() {
   const toPay = estimates.reduce((sum, e) => sum + e.est.cycle_total, 0);
   const msiLeft = estimates.reduce((sum, e) => sum + e.est.msi_remaining, 0);
   const nextDue = [...estimates].sort((a, b) => a.est.due_date.localeCompare(b.est.due_date))[0];
+  const today = todayIso();
+  const quincenas = quincenaTotals(
+    cards.flatMap((c) => paymentObligations(finance.estimates[c.id], finance.payStatus[c.id], today)),
+    today,
+  );
 
   const categoryName = (id: string | null) => finance.categories.find((c) => c.id === id)?.name ?? "Sin categoría";
   const cardOf = (id: string | null) => finance.cards.find((c) => c.id === id);
@@ -45,6 +67,24 @@ export default function Resumen() {
         <Stat label="Por pagar (ciclo)" value={mxn(toPay)} hint="suma de tus tarjetas" />
         <Stat label="MSI pendiente" value={mxn(msiLeft)} />
         <Stat label="Por revisar" value={String(pending)} hint="capturas sin confirmar" />
+      </section>
+
+      <section className="mt-12 grid gap-6 md:grid-cols-2">
+        <QuincenaCard
+          title={quincenas.nextFirstEnd ? "Próximo mes a pagar 1ª quincena" : "A pagar 1ª quincena"}
+          range={quincenas.nextFirstEnd ? `Vence del 1 al ${dayLabel(quincenas.nextFirstEnd)}` : "Vence del 1 al 15"}
+          quincena={quincenas.first}
+        />
+        <QuincenaCard title="A pagar 2ª quincena" range="Vence del 16 a fin de mes" quincena={quincenas.second} highlight />
+      </section>
+
+      <section className="mt-6">
+        <Link href="/meses" className="block">
+          <Card>
+            <p className="font-semibold">Compras a meses</p>
+            <p className="text-sm text-muted">Mira cuánto pagarás de mensualidades en los próximos meses →</p>
+          </Card>
+        </Link>
       </section>
 
       <section className="mt-12 grid gap-6 lg:grid-cols-3">

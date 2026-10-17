@@ -55,6 +55,9 @@ import mx.finanzas.pareja.ui.session.SessionState
 import mx.finanzas.pareja.ui.statements.StatementImportScreen
 import mx.finanzas.pareja.ui.budgets.CategoryBudgetsScreen
 import mx.finanzas.pareja.ui.budgets.CategoryBudgetsViewModel
+import mx.finanzas.pareja.ui.duplicates.DismissedDuplicates
+import mx.finanzas.pareja.ui.duplicates.DuplicatesScreen
+import mx.finanzas.pareja.ui.duplicates.DuplicatesViewModel
 import mx.finanzas.pareja.ui.installments.InstallmentsScreen
 import mx.finanzas.pareja.ui.installments.InstallmentsViewModel
 import mx.finanzas.pareja.ui.reports.ReportsScreen
@@ -80,6 +83,7 @@ private const val ROUTE_CATEGORY_BUDGETS = "category_budgets"
 private const val ROUTE_REPORTS = "reports"
 private const val ROUTE_INSTALLMENTS = "installments"
 private const val ROUTE_INBOX = "inbox"
+private const val ROUTE_DUPLICATES = "duplicates"
 private const val ROUTE_STATEMENT_IMPORT = "statement_import"
 private const val ROUTE_FORM = "tx_form?id={id}"
 private const val ROUTE_PAYMENT_FORM = "payment_form?id={id}"
@@ -151,6 +155,7 @@ fun MainScaffold(
                     onAddCard = { nav.navigate(ROUTE_CARDS) },
                     onOpenInbox = { nav.navigate(ROUTE_INBOX) },
                     onOpenInstallments = { nav.navigate(ROUTE_INSTALLMENTS) },
+                    onOpenDuplicates = { nav.navigate(ROUTE_DUPLICATES) },
                 )
             }
             composable(ROUTE_INSTALLMENTS) {
@@ -158,6 +163,14 @@ fun MainScaffold(
                     factory = viewModelFactory { InstallmentsViewModel(repo, userId, today()) },
                 )
                 InstallmentsScreen(vm = vm, onBack = { nav.popBackStack() })
+            }
+            composable(ROUTE_DUPLICATES) {
+                val vm: DuplicatesViewModel = viewModel(
+                    factory = viewModelFactory {
+                        DuplicatesViewModel(repo, userId, today(), DismissedDuplicates.load(app)) { DismissedDuplicates.save(app, it) }
+                    },
+                )
+                DuplicatesScreen(vm = vm, userId = userId, onBack = { nav.popBackStack() }, onChanged = { refreshKey++ })
             }
             composable(ROUTE_INBOX) {
                 val vm: InboxViewModel = viewModel(

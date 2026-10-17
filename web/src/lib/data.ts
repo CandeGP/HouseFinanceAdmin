@@ -65,6 +65,25 @@ export interface PayStatus {
   status: PayState;
 }
 
+/** Una mensualidad futura de una compra a meses (función SQL msi_schedule). */
+export interface MsiInstallment {
+  card_id: string;
+  transaction_id: string;
+  merchant: string;
+  cycle_end: string;
+  due_date: string;
+  installment_number: number;
+  installments: number;
+  amount: number;
+}
+
+/** Saldo utilizado que mostraba el banco en `checked_on`, capturado desde la app. */
+export interface BalanceCheck {
+  card_id: string;
+  bank_balance: number;
+  checked_on: string;
+}
+
 export interface Finance {
   members: Member[];
   cards: Card[];
@@ -73,7 +92,26 @@ export interface Finance {
   estimates: Record<string, Estimate>;
   monthSpend: Record<string, MonthSpend>;
   payStatus: Record<string, PayStatus>;
+  /** Mensualidades que faltan, ciclo por ciclo; vacío si el servidor aún no tiene la función. */
+  msi: MsiInstallment[];
+  /** Última captura del saldo del banco por tarjeta. */
+  balanceChecks: Record<string, BalanceCheck>;
 }
+
+/** Fila de la función SQL card_snapshots: estimación del ciclo y estado de pago (prefijo st_) en una llamada. */
+interface SnapshotRow extends Partial<Estimate> {
+  card_id: string;
+  st_cutoff_date: string | null;
+  st_due_date: string | null;
+  st_target_amount: number | null;
+  st_target_source: "statement" | "estimate" | null;
+  st_minimum_payment: number | null;
+  st_paid_amount: number | null;
+  st_remaining: number | null;
+  st_status: PayState | null;
+}
+
+const MSI_HORIZON_MONTHS = 60;
 
 const MONTHS_BACK = 6;
 const TX_LIMIT = 1000;
@@ -106,14 +144,13 @@ export async function loadFinance(): Promise<Finance> {
   }
 
   const cardRows = (cards.data ?? []) as Card[];
-  const pairs = await Promise.all(
-    cardRows.map(async (card) => {
-      const { data, error } = await supabase.rpc("card_cycle_estimate", { p_card_id: card.id });
-      if (error) throw new Error(error.message);
-      const row = (data as Estimate[] | null)?.[0];
-      return row ? ([card.id, row] as const) : null;
-    }),
-  );
+
+  // Una sola consulta trae la estimación y el estado de pago de todas las tarjetas; si la función aún no
+  // existe en el servidor, se cae a una consulta por tarjeta.
+  const snapshots = await loadSnapshots(cardRows);
+
+  // Calendario de compras a meses y saldos del banco: si fallan, el resto de la página sigue funcionando.
+  const [msi, checks] = await Promise.all([loadMsi(), loadBalanceChecks()]);
 
   // Solo las tarjetas con presupuesto necesitan el gasto del mes.
   const spendPairs = await Promise.all(
@@ -127,22 +164,81 @@ export async function loadFinance(): Promise<Finance> {
       }),
   );
 
-  const statusPairs = await Promise.all(
-    cardRows.map(async (card) => {
-      const { data, error } = await supabase.rpc("card_cycle_status", { p_card: card.id });
-      if (error) throw new Error(error.message);
-      const row = (data as PayStatus[] | null)?.[0];
-      return row ? ([card.id, row] as const) : null;
-    }),
-  );
-
   return {
     members: (members.data ?? []) as Member[],
     cards: cardRows,
     categories: (categories.data ?? []) as Category[],
     txs: (txs.data ?? []) as Tx[],
-    estimates: Object.fromEntries(pairs.filter((p) => p !== null)),
+    estimates: snapshots.estimates,
     monthSpend: Object.fromEntries(spendPairs.filter((p) => p !== null)),
+    payStatus: snapshots.payStatus,
+    msi,
+    balanceChecks: checks,
+  };
+}
+
+interface Snapshots { estimates: Record<string, Estimate>; payStatus: Record<string, PayStatus> }
+
+async function loadSnapshots(cards: Card[]): Promise<Snapshots> {
+  const { data, error } = await supabase.rpc("card_snapshots");
+  if (!error) {
+    const ids = new Set(cards.map((c) => c.id));
+    const estimates: Record<string, Estimate> = {};
+    const payStatus: Record<string, PayStatus> = {};
+    for (const row of (data ?? []) as SnapshotRow[]) {
+      if (!ids.has(row.card_id)) continue;
+      if (row.cycle_start && row.cycle_end && row.due_date) estimates[row.card_id] = row as Estimate;
+      if (row.st_cutoff_date && row.st_due_date && row.st_status) {
+        payStatus[row.card_id] = {
+          cutoff_date: row.st_cutoff_date,
+          due_date: row.st_due_date,
+          target_amount: row.st_target_amount ?? 0,
+          target_source: row.st_target_source ?? "estimate",
+          minimum_payment: row.st_minimum_payment,
+          paid_amount: row.st_paid_amount ?? 0,
+          remaining: row.st_remaining ?? 0,
+          status: row.st_status,
+        };
+      }
+    }
+    return { estimates, payStatus };
+  }
+
+  const estimatePairs = await Promise.all(
+    cards.map(async (card) => {
+      const { data: est, error: e } = await supabase.rpc("card_cycle_estimate", { p_card_id: card.id });
+      if (e) throw new Error(e.message);
+      const row = (est as Estimate[] | null)?.[0];
+      return row ? ([card.id, row] as const) : null;
+    }),
+  );
+  const statusPairs = await Promise.all(
+    cards.map(async (card) => {
+      const { data: st, error: e } = await supabase.rpc("card_cycle_status", { p_card: card.id });
+      if (e) throw new Error(e.message);
+      const row = (st as PayStatus[] | null)?.[0];
+      return row ? ([card.id, row] as const) : null;
+    }),
+  );
+  return {
+    estimates: Object.fromEntries(estimatePairs.filter((p) => p !== null)),
     payStatus: Object.fromEntries(statusPairs.filter((p) => p !== null)),
   };
+}
+
+async function loadMsi(): Promise<MsiInstallment[]> {
+  const { data, error } = await supabase.rpc("msi_schedule", { p_months: MSI_HORIZON_MONTHS });
+  return error ? [] : ((data ?? []) as MsiInstallment[]);
+}
+
+async function loadBalanceChecks(): Promise<Record<string, BalanceCheck>> {
+  const { data, error } = await supabase
+    .from("card_balance_checks")
+    .select("card_id,bank_balance,checked_on")
+    .order("checked_on", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) return {};
+  const latest: Record<string, BalanceCheck> = {};
+  for (const row of (data ?? []) as BalanceCheck[]) if (!latest[row.card_id]) latest[row.card_id] = row;
+  return latest;
 }

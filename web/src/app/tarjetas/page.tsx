@@ -3,10 +3,12 @@
 import { useFinance } from "@/components/Shell";
 import { Bar, Card, PageTitle, Tag } from "@/components/ui";
 import { cardAccent, cardLabel } from "@/lib/cards";
-import { dayLabel, mxn, payLabel } from "@/lib/format";
+import { dayLabel, mxn, payLabel, todayIso } from "@/lib/format";
+import { balanceMessage, compareBalance, debtTotal, dueLine, nextPayment } from "@/lib/plan";
 
 export default function Tarjetas() {
   const { finance, uid, scope } = useFinance();
+  const today = todayIso();
   const cards = finance.cards.filter((c) => scope === "both" || c.owner_id === uid);
   const ownerLabel = (id: string) => finance.members.find((m) => m.user_id === id)?.display_name ?? "—";
 
@@ -38,6 +40,15 @@ export default function Tarjetas() {
                   {payLabel(finance.payStatus[card.id])}
                 </p>
               ) : null}
+
+              {(() => {
+                const next = nextPayment(est, finance.payStatus[card.id], today);
+                return next ? (
+                  <p className="mt-2 text-sm">
+                    <span className="font-bold">{mxn(next.amount)}</span> · {dueLine(next, dayLabel)}
+                  </p>
+                ) : null;
+              })()}
 
               {card.monthly_budget !== null ? (
                 <div className="mt-6">
@@ -88,9 +99,24 @@ export default function Tarjetas() {
                     <dd className="text-right font-semibold">{mxn(est.msi_remaining)}</dd>
                     <dt className="font-semibold">Debes en total</dt>
                     <dd className="text-right text-lg font-bold tracking-[-0.03em]">
-                      {mxn(est.cycle_total + est.msi_remaining)}
+                      {mxn(debtTotal(est, finance.payStatus[card.id]))}
                     </dd>
                   </dl>
+                  {(() => {
+                    const check = finance.balanceChecks[card.id];
+                    if (!check) return null;
+                    const cmp = compareBalance(debtTotal(est, finance.payStatus[card.id]), check.bank_balance);
+                    return (
+                      <div className="mt-4 rounded-xl bg-canvas p-4 text-sm">
+                        <p className="text-muted">
+                          Banco {mxn(check.bank_balance)} ({dayLabel(check.checked_on)}) · la app suma {mxn(cmp.app)}
+                        </p>
+                        <p className={cmp.verdict === "match" ? "mt-1 font-semibold" : "mt-1 font-semibold text-red-600 dark:text-red-400"}>
+                          {balanceMessage(cmp, mxn)}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </>
               ) : (
                 <p className="mt-6 text-muted">Sin ciclo calculado todavía.</p>

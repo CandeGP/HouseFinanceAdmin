@@ -39,6 +39,12 @@ export const payLabel = (s: {
   }
 };
 
+/** Hoy en la zona del navegador, como "2026-10-16". */
+export const todayIso = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
+
 export const currentMonth = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

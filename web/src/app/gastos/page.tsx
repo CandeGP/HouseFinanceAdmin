@@ -32,7 +32,14 @@ export default function Gastos() {
   const [query, setQuery] = useState("");
 
   const txs = finance.txs.filter((t) => scope === "both" || t.owner_id === uid);
-  const months = [...new Set(txs.map((t) => monthKey(t.occurred_at)))].sort().reverse();
+  // Mensualidades de compras a meses que se pagan en cada mes (también los futuros, que no tienen gastos).
+  const myCards = new Set(finance.cards.filter((c) => c.owner_id === uid).map((c) => c.id));
+  const scheduled = finance.msi.filter((m) => scope === "both" || myCards.has(m.card_id));
+  const months = [...new Set([...txs.map((t) => monthKey(t.occurred_at)), ...scheduled.map((m) => monthKey(m.due_date))])]
+    .sort()
+    .reverse();
+  const monthScheduled =
+    month === "all" ? [] : scheduled.filter((m) => monthKey(m.due_date) === month).sort((a, b) => b.amount - a.amount);
   const needle = query.trim().toLowerCase();
 
   const rows = txs.filter(
@@ -71,6 +78,36 @@ export default function Gastos() {
         </button>
         {notice ? <span className="text-sm text-muted">{notice}</span> : null}
       </div>
+
+      {monthScheduled.length > 0 ? (
+        <Card className="mb-6 p-0">
+          <div className="flex items-center justify-between gap-4 px-6 py-4">
+            <div>
+              <p className="font-semibold">Mensualidades programadas (compras a meses)</p>
+              <p className="text-sm text-muted">{monthScheduled.length} mensualidades · no cuentan como gasto nuevo</p>
+            </div>
+            <p className="text-lg font-bold tracking-[-0.03em]">{mxn(monthScheduled.reduce((s, m) => s + m.amount, 0))}</p>
+          </div>
+          <div className="divide-y divide-line border-t border-line">
+            {monthScheduled.map((m) => (
+              <div key={`${m.transaction_id}-${m.due_date}`} className="flex items-center justify-between gap-4 px-6 py-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{m.merchant}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
+                    <span>Vence {dayLabel(m.due_date)}</span>
+                    {cardOf(m.card_id) ? <CardChip card={cardOf(m.card_id)!} /> : null}
+                    <Tag>
+                      MSI {m.installment_number}/{m.installments}
+                      {m.installment_number >= m.installments ? " · última" : ""}
+                    </Tag>
+                  </div>
+                </div>
+                <p className="font-semibold tracking-[-0.03em]">{mxn(m.amount)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       <Card className="divide-y divide-line p-0">
         {rows.map((t) => (
