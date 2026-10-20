@@ -26,7 +26,10 @@ export default function Tarjetas() {
                   <h2 className="text-2xl font-semibold tracking-[-0.03em]">{card.name}</h2>
                   <p className="text-muted">{cardLabel(card)}</p>
                 </div>
-                <Tag>{ownerLabel(card.owner_id)}</Tag>
+                <div className="flex gap-2">
+                  {card.has_cashback ? <Tag>Cashback</Tag> : null}
+                  <Tag>{ownerLabel(card.owner_id)}</Tag>
+                </div>
               </div>
 
               {finance.payStatus[card.id] ? (

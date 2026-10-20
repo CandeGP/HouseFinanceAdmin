@@ -79,6 +79,8 @@ data class Card(
     @SerialName("alt_last4") val altLast4: List<String> = emptyList(),
     /** Tope de gasto por mes calendario; null si no tiene presupuesto. */
     @SerialName("monthly_budget") val monthlyBudget: Double? = null,
+    /** La tarjeta da cashback o bonificaciones. */
+    @SerialName("has_cashback") val hasCashback: Boolean = false,
 )
 
 /** Resultado de la RPC `card_month_spend`: gasto del mes de una tarjeta frente a su presupuesto. */

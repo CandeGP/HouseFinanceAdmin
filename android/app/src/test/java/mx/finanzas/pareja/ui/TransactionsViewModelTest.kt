@@ -4,6 +4,7 @@ import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.FakeFinanceRepository
 import mx.finanzas.pareja.MainDispatcherRule
 import mx.finanzas.pareja.tx
+import mx.finanzas.pareja.domain.TxSort
 import mx.finanzas.pareja.ui.dashboard.Scope
 import mx.finanzas.pareja.ui.transactions.TransactionsViewModel
 import org.junit.Assert.assertEquals
@@ -21,7 +22,12 @@ class TransactionsViewModelTest {
         )
     }
 
-    private fun vm() = TransactionsViewModel(repo, userId = "u1", today = LocalDate(2026, 10, 14))
+    private fun rawVm() = TransactionsViewModel(repo, userId = "u1", today = LocalDate(2026, 10, 14))
+
+    private fun vm() = rawVm().also { it.setScope(Scope.BOTH) }
+
+    @Test
+    fun `arranca en Mios`() = assertEquals(Scope.MINE, rawVm().state.value.scope)
 
     @Test
     fun `carga el mes actual con ambos por defecto`() {
@@ -30,6 +36,19 @@ class TransactionsViewModelTest {
         assertEquals(10, s.month)
         assertEquals(setOf("oct-mine", "oct-partner"), s.items.map { it.id }.toSet())
         assertEquals(LocalDate(2026, 10, 1) to LocalDate(2026, 10, 31), repo.lastRange)
+    }
+
+    @Test
+    fun `filtra por tarjeta y ordena por monto sin recargar`() {
+        val vm = vm()
+        val cardId = vm.state.value.items.first().cardId
+        vm.setSort(TxSort.HIGHEST)
+        val amounts = vm.state.value.items.map { it.amount }
+        assertEquals(amounts.sortedDescending(), amounts)
+        vm.setCardFilter("no-existe")
+        assertEquals(emptyList<String>(), vm.state.value.items.map { it.id })
+        vm.setCardFilter(cardId)
+        assertEquals(TxSort.HIGHEST, vm.state.value.sort)
     }
 
     @Test

@@ -23,6 +23,35 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun `un codigo inexistente no abre el registro`() {
+        val vm = SessionViewModel(repo)
+        vm.checkInvite("NOEXISTE")
+        assertEquals(null, vm.invite.value)
+        assertTrue(vm.message.value!!.contains("código"))
+    }
+
+    @Test
+    fun `con codigo valido se crea la cuenta y se entra al hogar`() {
+        repo.invites["ABC123"] = "Casa"
+        val vm = SessionViewModel(repo)
+        vm.checkInvite(" abc123 ")
+        assertEquals("Casa", vm.invite.value?.householdName)
+
+        vm.signUpWithInvite("a@b.mx", "secreto", "Czesto")
+
+        assertEquals("Czesto", (vm.state.value as SessionState.Ready).me.displayName)
+        assertEquals(null, vm.invite.value)
+    }
+
+    @Test
+    fun `sin validar el codigo no se crea cuenta con invitacion`() {
+        val vm = SessionViewModel(repo)
+        vm.signUpWithInvite("a@b.mx", "secreto", "Czesto")
+        assertEquals(SessionState.SignedOut, vm.state.value)
+        assertEquals(null, repo.userId)
+    }
+
+    @Test
     fun `usuario sin hogar necesita crear o unirse a uno`() {
         repo.userId = "u1"
         val vm = SessionViewModel(repo)

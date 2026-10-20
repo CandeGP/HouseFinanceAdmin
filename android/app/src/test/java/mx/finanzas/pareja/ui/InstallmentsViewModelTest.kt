@@ -32,13 +32,15 @@ class InstallmentsViewModelTest {
         )
     }
 
-    private fun vm() = InstallmentsViewModel(repo, userId = "u1", today = today)
+    private fun rawVm() = InstallmentsViewModel(repo, userId = "u1", today = today)
+
+    private fun vm() = rawVm().also { it.setScope(Scope.BOTH) }
 
     @Test
-    fun `por defecto muestra las compras a meses de los dos agrupadas por mes`() {
+    fun `arranca en Mios y con Ambos agrupa las compras a meses de los dos por mes`() {
+        assertEquals(Scope.MINE, rawVm().state.value.scope)
         val s = vm().state.value
 
-        assertEquals(Scope.BOTH, s.scope)
         assertEquals(listOf(11, 12), s.months.map { it.month })
         assertEquals(948.61 + 416.50, s.months.first().total, 0.001)
         assertEquals(false, s.loading)

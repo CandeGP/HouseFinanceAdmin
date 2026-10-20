@@ -2,6 +2,7 @@ package mx.finanzas.pareja.ui.transactions
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -19,6 +20,9 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -48,6 +52,7 @@ import mx.finanzas.pareja.data.PaymentMode
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TxStatus
 import mx.finanzas.pareja.domain.SpendingSlice
+import mx.finanzas.pareja.domain.TxSort
 import mx.finanzas.pareja.domain.formatDayMonthEs
 import mx.finanzas.pareja.domain.formatMonthEs
 import mx.finanzas.pareja.domain.formatMxn
@@ -117,6 +122,13 @@ fun TransactionsScreen(
                 )
             }
             ErrorText(state.error, Modifier.padding(horizontal = 16.dp))
+            FilterBar(
+                cards = state.cards,
+                cardFilter = state.cardFilter,
+                sort = state.sort,
+                onCard = vm::setCardFilter,
+                onSort = vm::setSort,
+            )
 
             TabRow(selectedTabIndex = tab) {
                 TABS.forEachIndexed { index, title ->
@@ -184,6 +196,40 @@ fun TransactionsScreen(
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancelar") } },
         )
+    }
+}
+
+/** Filtro por tarjeta y orden de los gastos (por defecto, por fecha). */
+@Composable
+private fun FilterBar(
+    cards: List<CardModel>,
+    cardFilter: String?,
+    sort: TxSort,
+    onCard: (String?) -> Unit,
+    onSort: (TxSort) -> Unit,
+) {
+    var cardMenu by remember { mutableStateOf(false) }
+    var sortMenu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box {
+            OutlinedButton(onClick = { cardMenu = true }) {
+                Text("Tarjeta: " + (cards.firstOrNull { it.id == cardFilter }?.name ?: "todas"), maxLines = 1)
+            }
+            DropdownMenu(expanded = cardMenu, onDismissRequest = { cardMenu = false }) {
+                DropdownMenuItem(text = { Text("Todas") }, onClick = { onCard(null); cardMenu = false })
+                cards.forEach { card ->
+                    DropdownMenuItem(text = { Text("${card.name} •••• ${card.last4}") }, onClick = { onCard(card.id); cardMenu = false })
+                }
+            }
+        }
+        Box {
+            OutlinedButton(onClick = { sortMenu = true }) { Text("Orden: " + sort.label.lowercase(), maxLines = 1) }
+            DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                TxSort.entries.forEach { option ->
+                    DropdownMenuItem(text = { Text(option.label) }, onClick = { onSort(option); sortMenu = false })
+                }
+            }
+        }
     }
 }
 

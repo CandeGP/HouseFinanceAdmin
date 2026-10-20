@@ -22,6 +22,8 @@ data class NextPayment(
     val paidClosedCycle: Boolean,
     /** Días de hoy a la fecha límite; negativo si ya venció. */
     val daysUntilDue: Int = 0,
+    /** Tarjeta a la que corresponde el pago (para listar qué tarjetas componen una quincena). */
+    val cardId: String? = null,
 )
 
 /** Todo lo que se debe pagar de una tarjeta: el corte cerrado sin pagar (si lo hay) y el ciclo abierto. */
@@ -31,7 +33,7 @@ fun paymentObligations(view: CardCycleView, status: CardCycleStatus?, today: Loc
         listOf(
             NextPayment(
                 unpaid, status.dueDate, fromClosedCycle = true, overdue = status.dueDate < today, paidClosedCycle = false,
-                daysUntilDue = today.daysUntil(status.dueDate),
+                daysUntilDue = today.daysUntil(status.dueDate), cardId = view.card.id,
             ),
         )
     } else emptyList()
@@ -42,6 +44,7 @@ fun paymentObligations(view: CardCycleView, status: CardCycleStatus?, today: Loc
         overdue = false,
         paidClosedCycle = status?.status == CardPayStatus.PAID && status.targetAmount > 0,
         daysUntilDue = today.daysUntil(view.estimate.dueDate),
+        cardId = view.card.id,
     )
     return closed + open
 }
@@ -83,7 +86,13 @@ fun sortByDue(ranking: List<CardRank>, payments: Map<String, NextPayment>): List
     )
 
 /** [overdue] es la parte de [total] que ya venció y sigue sin pagarse. */
-data class Quincena(val total: Double, val cards: Int, val overdue: Double = 0.0)
+data class Quincena(
+    val total: Double,
+    val cards: Int,
+    val overdue: Double = 0.0,
+    /** Los pagos que la componen, para ver de qué tarjetas es. */
+    val payments: List<NextPayment> = emptyList(),
+)
 
 /** Si [nextFirstEnd] no es null, el primer bloque es la 1ª quincena del mes que viene (termina ese día). */
 data class QuincenaTotals(val first: Quincena, val second: Quincena, val nextFirstEnd: LocalDate? = null)
@@ -91,7 +100,7 @@ data class QuincenaTotals(val first: Quincena, val second: Quincena, val nextFir
 val NO_QUINCENAS = QuincenaTotals(Quincena(0.0, 0), Quincena(0.0, 0))
 
 private fun quincenaOf(list: List<NextPayment>) =
-    Quincena(list.sumOf { it.amount }, list.size, list.filter { it.overdue }.sumOf { it.amount })
+    Quincena(list.sumOf { it.amount }, list.size, list.filter { it.overdue }.sumOf { it.amount }, list)
 
 /**
  * Suma lo que vence por quincena. Del 1 al 15 del mes: la 1ª y la 2ª de este mes. Pasado el 15, la 1ª ya

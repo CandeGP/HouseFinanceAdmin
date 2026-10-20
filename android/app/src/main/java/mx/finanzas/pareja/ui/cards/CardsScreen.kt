@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -200,7 +201,8 @@ fun CardsScreen(
                                     }
                                     Text(
                                         "${card.bank} •••• ${card.last4}" +
-                                            (if (mine) "" else " · de ${memberNames[card.ownerId] ?: "tu pareja"}"),
+                                            (if (mine) "" else " · de ${memberNames[card.ownerId] ?: "tu pareja"}") +
+                                            (if (card.hasCashback) " · Cashback" else ""),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -526,6 +528,7 @@ private fun CardEditDialog(
     }
     var budgetText by remember(card.id) { mutableStateOf(card.monthlyBudget?.let(::plainNumber).orEmpty()) }
     var color by remember(card.id) { mutableStateOf(card.color) }
+    var hasCashback by remember(card.id) { mutableStateOf(card.hasCashback) }
 
     @Composable
     fun field(label: String, value: String, field: CardField, keyboard: KeyboardType = KeyboardType.Text, onChange: (String) -> Unit) {
@@ -559,6 +562,10 @@ private fun CardEditDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Da cashback", Modifier.weight(1f))
+                    Switch(checked = hasCashback, onCheckedChange = { hasCashback = it })
+                }
                 Text("Color", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -585,7 +592,7 @@ private fun CardEditDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(CardEditDraft(draft, budgetText, color)) }) { Text("Guardar") }
+            TextButton(onClick = { onSave(CardEditDraft(draft, budgetText, color, hasCashback)) }) { Text("Guardar") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )

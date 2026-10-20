@@ -19,7 +19,7 @@ sealed interface CardDraftResult {
 private val LAST4 = Regex("""^\d{4}$""")
 
 /** Edición completa de una tarjeta existente: lo de la alta más presupuesto mensual y color. */
-data class ValidCardEdit(val card: ValidCard, val monthlyBudget: Double?, val color: String?)
+data class ValidCardEdit(val card: ValidCard, val monthlyBudget: Double?, val color: String?, val hasCashback: Boolean = false)
 
 sealed interface CardEditResult {
     data class Valid(val value: ValidCardEdit) : CardEditResult
@@ -36,6 +36,7 @@ data class CardEditDraft(
     val card: CardDraft,
     val budgetText: String = "",
     val color: String? = null,
+    val hasCashback: Boolean = false,
 ) {
     fun validate(): CardEditResult {
         val errors = linkedMapOf<CardField, String>()
@@ -53,7 +54,7 @@ data class CardEditDraft(
         if (colorInput != null && !HEX_COLOR.matches(colorInput)) errors[CardField.COLOR] = "Color inválido"
 
         if (errors.isNotEmpty() || base !is CardDraftResult.Valid) return CardEditResult.Invalid(errors)
-        return CardEditResult.Valid(ValidCardEdit(base.value, budget, colorInput?.uppercase()))
+        return CardEditResult.Valid(ValidCardEdit(base.value, budget, colorInput?.uppercase(), hasCashback))
     }
 }
 

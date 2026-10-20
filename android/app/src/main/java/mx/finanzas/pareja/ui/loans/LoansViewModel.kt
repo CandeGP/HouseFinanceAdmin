@@ -30,7 +30,7 @@ import mx.finanzas.pareja.domain.personBalances
 import mx.finanzas.pareja.ui.dashboard.Scope
 
 data class LoansUiState(
-    val scope: Scope = Scope.BOTH,
+    val scope: Scope = Scope.MINE,
     val balances: List<PersonBalance> = emptyList(),
     val totals: LoanTotals = LoanTotals(owedToYou = 0.0, youOwe = 0.0),
     /** Personas ya usadas, para sugerirlas al registrar un préstamo nuevo. */

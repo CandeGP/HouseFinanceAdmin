@@ -57,8 +57,19 @@ fun AppRoot(repo: FinanceRepository) {
                     SessionState.Loading ->
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     SessionState.Offline -> OfflineScreen(busy = busy, onRetry = vm::refresh)
-                    SessionState.SignedOut ->
-                        AuthScreen(busy = busy, message = message, onSignIn = vm::signIn, onSignUp = vm::signUp)
+                    SessionState.SignedOut -> {
+                        val invite by vm.invite.collectAsStateWithLifecycle()
+                        AuthScreen(
+                            busy = busy,
+                            message = message,
+                            invite = invite,
+                            onSignIn = vm::signIn,
+                            onSignUp = vm::signUp,
+                            onCheckInvite = vm::checkInvite,
+                            onClearInvite = vm::clearInvite,
+                            onSignUpWithInvite = vm::signUpWithInvite,
+                        )
+                    }
                     is SessionState.NeedsHousehold ->
                         OnboardingScreen(
                             busy = busy,

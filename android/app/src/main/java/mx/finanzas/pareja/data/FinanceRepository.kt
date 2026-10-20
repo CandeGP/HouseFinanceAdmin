@@ -30,6 +30,7 @@ data class CardEditPatch(
     @SerialName("due_day") val dueDay: Int,
     @SerialName("monthly_budget") val monthlyBudget: Double?,
     val color: String?,
+    @SerialName("has_cashback") val hasCashback: Boolean = false,
 )
 
 /**
@@ -48,6 +49,9 @@ interface FinanceRepository {
     suspend fun createHousehold(name: String, displayName: String): String
     suspend fun createInvite(householdId: String): String
     suspend fun acceptInvite(code: String, displayName: String): String
+
+    /** Nombre del hogar al que da acceso el código, o null si no existe, ya se usó o venció. No requiere sesión. */
+    suspend fun checkInvite(code: String): String?
 
     // Catálogos
     suspend fun categories(): List<Category>

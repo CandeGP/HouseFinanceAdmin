@@ -33,7 +33,7 @@ enum class Scope { MINE, BOTH }
 
 data class DashboardUiState(
     val loading: Boolean = true,
-    val scope: Scope = Scope.BOTH,
+    val scope: Scope = Scope.MINE,
     val summary: DashboardSummary = buildDashboard(emptyList()),
     val error: String? = null,
     /** Cobros capturados automáticamente que esperan revisión. */

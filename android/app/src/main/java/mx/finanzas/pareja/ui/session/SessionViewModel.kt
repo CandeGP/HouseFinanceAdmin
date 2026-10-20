@@ -24,6 +24,9 @@ sealed interface SessionState {
 
 private const val MIN_PASSWORD_LENGTH = 6
 
+/** Código de invitación ya validado contra el servidor, con el hogar al que lleva. */
+data class InviteInfo(val code: String, val householdName: String)
+
 class SessionViewModel(private val repo: FinanceRepository) : ViewModel() {
     private val _state = MutableStateFlow<SessionState>(SessionState.Loading)
     val state: StateFlow<SessionState> = _state.asStateFlow()
@@ -34,8 +37,62 @@ class SessionViewModel(private val repo: FinanceRepository) : ViewModel() {
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
+    private val _invite = MutableStateFlow<InviteInfo?>(null)
+    val invite: StateFlow<InviteInfo?> = _invite.asStateFlow()
+
     init {
         refresh()
+    }
+
+    /** Valida el código antes de pedir los datos de la cuenta: así se sabe de entrada si sirve. */
+    fun checkInvite(code: String) {
+        if (code.isBlank()) {
+            _message.value = "Escribe el código de invitación"
+            return
+        }
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val clean = code.trim().uppercase()
+                val household = repo.checkInvite(clean)
+                _invite.value = household?.let { InviteInfo(clean, it) }
+                _message.value = if (household == null) "El código no existe, ya se usó o venció" else null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = userMessage(e)
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    fun clearInvite() {
+        _invite.value = null
+        _message.value = null
+    }
+
+    /** Crea la cuenta y entra de una vez al hogar del código ya validado. */
+    fun signUpWithInvite(email: String, password: String, displayName: String) {
+        val invite = _invite.value ?: return
+        when {
+            displayName.isBlank() -> _message.value = "Escribe tu nombre"
+            email.isBlank() -> _message.value = "Escribe tu correo"
+            password.length < MIN_PASSWORD_LENGTH ->
+                _message.value = "La contraseña debe tener al menos $MIN_PASSWORD_LENGTH caracteres"
+            else -> launchAction {
+                repo.signUp(email.trim(), password)
+                try {
+                    repo.acceptInvite(invite.code, displayName.trim())
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    // La cuenta ya existe: se pasa a la pantalla del hogar para reintentar el código ahí.
+                    _state.value = resolve()
+                    throw e
+                }
+                _invite.value = null
+            }
+        }
     }
 
     fun refresh() = launchAction { /* solo resuelve el estado */ }

@@ -103,6 +103,14 @@ class FakeFinanceRepository : FinanceRepository {
         return "h1"
     }
 
+    /** Códigos de invitación vigentes: código -> nombre del hogar. */
+    val invites: MutableMap<String, String> = mutableMapOf()
+
+    override suspend fun checkInvite(code: String): String? {
+        failIfNeeded()
+        return invites[code.trim().uppercase()]
+    }
+
     override suspend fun categories(): List<Category> = categoryList
 
     /** Gasto del mes por id de categoría, y el presupuesto de quien consulta (individual). */

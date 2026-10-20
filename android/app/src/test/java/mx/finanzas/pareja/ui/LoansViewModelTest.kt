@@ -41,7 +41,7 @@ class LoansViewModelTest {
         )
     }
 
-    private fun vm() = LoansViewModel(repo, userId = "u1", householdId = "h1", today = today)
+    private fun vm() = LoansViewModel(repo, userId = "u1", householdId = "h1", today = today).also { it.setScope(Scope.BOTH) }
 
     @Test
     fun `carga los saldos por persona de ambos y las personas sugeridas`() {

@@ -94,6 +94,9 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
             },
         ).decodeAs<String>()
 
+    override suspend fun checkInvite(code: String): String? =
+        client.postgrest.rpc("check_invite", buildJsonObject { put("p_code", code) }).decodeAsOrNull<String>()
+
     // ---- Catálogos
     override suspend fun categories(): List<Category> =
         client.postgrest.from("categories").select {

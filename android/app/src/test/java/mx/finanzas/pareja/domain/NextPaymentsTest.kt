@@ -111,8 +111,8 @@ class NextPaymentsTest {
             listOf(pay(100.0, LocalDate(2026, 10, 13)), pay(50.0, LocalDate(2026, 10, 15)), pay(300.0, LocalDate(2026, 10, 16)), pay(25.0, LocalDate(2026, 10, 31))),
             early,
         )
-        assertEquals(Quincena(150.0, 2), totals.first)
-        assertEquals(Quincena(325.0, 2), totals.second)
+        assertEquals(Quincena(150.0, 2), totals.first.copy(payments = emptyList()))
+        assertEquals(Quincena(325.0, 2), totals.second.copy(payments = emptyList()))
         assertNull(totals.nextFirstEnd)
     }
 
@@ -133,8 +133,8 @@ class NextPaymentsTest {
             today,
         )
         assertEquals(LocalDate(2026, 11, 15), totals.nextFirstEnd)
-        assertEquals(Quincena(1000.0, 2), totals.first)
-        assertEquals(Quincena(400.0, 1), totals.second)
+        assertEquals(Quincena(1000.0, 2), totals.first.copy(payments = emptyList()))
+        assertEquals(Quincena(400.0, 1), totals.second.copy(payments = emptyList()))
     }
 
     @Test
@@ -142,15 +142,15 @@ class NextPaymentsTest {
         val vencido = NextPayment(200.0, LocalDate(2026, 10, 13), fromClosedCycle = true, overdue = true, paidClosedCycle = false)
         val totals = quincenaTotals(listOf(vencido, pay(50.0, LocalDate(2026, 10, 25))), today)
 
-        assertEquals(Quincena(250.0, 2, overdue = 200.0), totals.second)
-        assertEquals(Quincena(0.0, 0), totals.first)
+        assertEquals(Quincena(250.0, 2, overdue = 200.0), totals.second.copy(payments = emptyList()))
+        assertEquals(Quincena(0.0, 0), totals.first.copy(payments = emptyList()))
     }
 
     @Test
     fun `en diciembre el mes que viene es enero del otro año`() {
         val totals = quincenaTotals(listOf(pay(120.0, LocalDate(2027, 1, 10))), LocalDate(2026, 12, 20))
         assertEquals(LocalDate(2027, 1, 15), totals.nextFirstEnd)
-        assertEquals(Quincena(120.0, 1), totals.first)
+        assertEquals(Quincena(120.0, 1), totals.first.copy(payments = emptyList()))
     }
 
     @Test

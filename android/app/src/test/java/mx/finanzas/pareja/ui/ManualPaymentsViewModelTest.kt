@@ -31,7 +31,7 @@ class ManualPaymentsViewModelTest {
         )
     }
 
-    private fun vm() = ManualPaymentsViewModel(repo, userId = "u1", today = LocalDate(2026, 10, 14), zone = zone)
+    private fun vm() = ManualPaymentsViewModel(repo, userId = "u1", today = LocalDate(2026, 10, 14), zone = zone).also { it.setScope(Scope.BOTH) }
 
     @Test
     fun `carga el mes actual usando los limites en hora de Mexico`() {

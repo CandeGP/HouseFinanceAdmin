@@ -154,7 +154,7 @@ class CardsViewModel(
                         CardEditPatch(
                             name = v.card.name, bank = v.card.bank, last4 = v.card.last4,
                             creditLimit = v.card.creditLimit, cutoffDay = v.card.cutoffDay, dueDay = v.card.dueDay,
-                            monthlyBudget = v.monthlyBudget, color = v.color,
+                            monthlyBudget = v.monthlyBudget, color = v.color, hasCashback = v.hasCashback,
                         ),
                     )
                     _state.update { it.copy(editErrors = emptyMap(), edited = true) }

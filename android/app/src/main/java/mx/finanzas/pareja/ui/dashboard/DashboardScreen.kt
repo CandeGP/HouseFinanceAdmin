@@ -16,6 +16,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +56,38 @@ fun DashboardScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(refreshKey) { if (refreshKey > 0) vm.load() }
+    var openQuincena by remember { mutableStateOf<Pair<String, Quincena>?>(null) }
+
+    openQuincena?.let { (title, quincena) ->
+        val cardsById = state.summary.ranking.associate { it.view.card.id to it.view.card }
+        AlertDialog(
+            onDismissRequest = { openQuincena = null },
+            title = { Text(title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (quincena.payments.isEmpty()) Text("Nada pendiente en esta quincena.")
+                    quincena.payments.sortedBy { it.dueDate }.forEach { payment ->
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(
+                                    cardsById[payment.cardId]?.let { "${it.name} •••• ${it.last4}" } ?: "Tarjeta",
+                                    modifier = Modifier.weight(1f),
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(formatMxn(payment.amount), fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                payment.dueLine(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (payment.overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { openQuincena = null }) { Text("Cerrar") } },
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -93,7 +130,9 @@ fun DashboardScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item { QuincenaCards(state.quincenas) }
+                item {
+                    QuincenaCards(state.quincenas) { title, quincena -> openQuincena = title to quincena }
+                }
                 item { InstallmentsEntry(onOpenInstallments) }
                 item { DuplicatesEntry(onOpenDuplicates) }
                 if (state.recurring.isNotEmpty()) item { RecurringCard(state.recurring) }
@@ -142,7 +181,7 @@ private fun DuplicatesEntry(onOpen: () -> Unit) {
 
 /** Lo que vence este mes, en dos bloques grandes: pagos del 1 al 15 y del 16 a fin de mes. */
 @Composable
-private fun QuincenaCards(totals: QuincenaTotals) {
+private fun QuincenaCards(totals: QuincenaTotals, onOpen: (title: String, quincena: Quincena) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         val nextFirstEnd = totals.nextFirstEnd
         QuincenaCard(
@@ -152,11 +191,13 @@ private fun QuincenaCards(totals: QuincenaTotals) {
             container = MaterialTheme.colorScheme.primaryContainer,
             content = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier.weight(1f),
+            onClick = { onOpen(if (nextFirstEnd != null) "Próximo mes a pagar 1ª quincena" else "A pagar 1ª quincena", totals.first) },
         )
         QuincenaCard(
             "A pagar 2ª quincena", "Vence del 16 a fin de mes", totals.second,
             MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer,
             Modifier.weight(1f),
+            onClick = { onOpen("A pagar 2ª quincena", totals.second) },
         )
     }
 }
@@ -169,8 +210,13 @@ private fun QuincenaCard(
     container: androidx.compose.ui.graphics.Color,
     content: androidx.compose.ui.graphics.Color,
     modifier: Modifier,
+    onClick: () -> Unit,
 ) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = container, contentColor = content)) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.labelLarge)
             Text(

@@ -103,7 +103,7 @@ function Workspace({ uid, children }: { uid: string; children: ReactNode }) {
   const pathname = usePathname();
   const [finance, setFinance] = useState<Finance | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [scope, setScope] = useState<Scope>("both");
+  const [scope, setScope] = useState<Scope>("mine");
 
   const reload = useCallback(() => {
     setError(null);

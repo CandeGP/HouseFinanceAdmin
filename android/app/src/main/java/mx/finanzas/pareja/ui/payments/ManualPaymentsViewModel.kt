@@ -22,7 +22,7 @@ import kotlinx.datetime.plus
 data class ManualPaymentsUiState(
     val year: Int,
     val month: Int,
-    val scope: Scope = Scope.BOTH,
+    val scope: Scope = Scope.MINE,
     val items: List<ManualPayment> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,

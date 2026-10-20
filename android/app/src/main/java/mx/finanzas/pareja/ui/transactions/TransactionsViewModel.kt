@@ -15,6 +15,8 @@ import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MsiInstallment
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.userMessage
+import mx.finanzas.pareja.domain.TxSort
+import mx.finanzas.pareja.domain.filterAndSort
 import mx.finanzas.pareja.domain.monthBounds
 import mx.finanzas.pareja.ui.dashboard.Scope
 import mx.finanzas.pareja.ui.installments.INSTALLMENT_HORIZON_MONTHS
@@ -22,12 +24,15 @@ import mx.finanzas.pareja.ui.installments.INSTALLMENT_HORIZON_MONTHS
 data class TransactionsUiState(
     val year: Int,
     val month: Int,
-    val scope: Scope = Scope.BOTH,
+    val scope: Scope = Scope.MINE,
     val items: List<Transaction> = emptyList(),
     val cards: List<Card> = emptyList(),
     val categories: List<Category> = emptyList(),
     /** Mensualidades de compras a meses que se pagan en el mes elegido (según el alcance). */
     val installments: List<MsiInstallment> = emptyList(),
+    /** Filtro por tarjeta (null = todas) y orden de los movimientos; por defecto, por fecha. */
+    val cardFilter: String? = null,
+    val sort: TxSort = TxSort.DATE,
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -78,6 +83,16 @@ class TransactionsViewModel(
         publish()
     }
 
+    fun setCardFilter(cardId: String?) {
+        _state.update { it.copy(cardFilter = cardId) }
+        publish()
+    }
+
+    fun setSort(sort: TxSort) {
+        _state.update { it.copy(sort = sort) }
+        publish()
+    }
+
     fun previousMonth() = shiftMonth(-1)
     fun nextMonth() = shiftMonth(1)
 
@@ -110,6 +125,6 @@ class TransactionsViewModel(
             .filter { it.dueDate.year == _state.value.year && it.dueDate.monthNumber == _state.value.month }
             .filter { scope == Scope.BOTH || it.cardId in myCards }
             .sortedByDescending { it.amount }
-        _state.update { it.copy(items = visible, installments = installments) }
+        _state.update { it.copy(items = filterAndSort(visible, it.cardFilter, it.sort), installments = installments) }
     }
 }

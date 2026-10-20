@@ -30,12 +30,15 @@ class DashboardViewModelTest {
         estimates["old"] = estimate(7777.0)
     }
 
-    private fun vm() = DashboardViewModel(repo, userId = "u1", today = { LocalDate(2026, 10, 14) })
+    private fun rawVm() = DashboardViewModel(repo, userId = "u1", today = { LocalDate(2026, 10, 14) })
+
+    // Los demás casos prueban con los dos; arrancar en "Míos" se cubre en el primero.
+    private fun vm() = rawVm().also { it.setScope(Scope.BOTH) }
 
     @Test
-    fun `por defecto muestra ambos y excluye tarjetas archivadas`() {
+    fun `arranca en Mios y con Ambos excluye tarjetas archivadas`() {
+        assertEquals(Scope.MINE, rawVm().state.value.scope)
         val s = vm().state.value
-        assertEquals(Scope.BOTH, s.scope)
         assertEquals(listOf("mine-b", "partner", "mine-a"), s.summary.ranking.map { it.view.card.id })
         assertEquals(1500.0, s.summary.totalCycle, 0.0)
     }

@@ -15,6 +15,12 @@ class CardEditDraftTest {
     private fun invalid(d: CardEditDraft) = (d.validate() as CardEditResult.Invalid).errors
 
     @Test
+    fun `el cashback se conserva al validar y por defecto esta apagado`() {
+        assertEquals(true, valid(CardEditDraft(base, hasCashback = true)).hasCashback)
+        assertEquals(false, valid(CardEditDraft(base)).hasCashback)
+    }
+
+    @Test
     fun `una edicion completa es valida y normaliza el color`() {
         val v = valid(CardEditDraft(base, budgetText = "\$2,000", color = "#375390"))
         assertEquals(2000.0, v.monthlyBudget!!, 0.0)

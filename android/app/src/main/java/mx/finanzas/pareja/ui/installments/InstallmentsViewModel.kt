@@ -23,7 +23,7 @@ const val INSTALLMENT_HORIZON_MONTHS = 60
 data class InstallmentsUiState(
     val months: List<MsiMonth> = emptyList(),
     val cards: Map<String, Card> = emptyMap(),
-    val scope: Scope = Scope.BOTH,
+    val scope: Scope = Scope.MINE,
     val loading: Boolean = true,
     val message: String? = null,
 )
