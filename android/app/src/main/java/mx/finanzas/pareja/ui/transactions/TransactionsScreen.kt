@@ -63,6 +63,7 @@ import mx.finanzas.pareja.ui.components.CategoryTag
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.components.ScopeToggle
+import mx.finanzas.pareja.ui.dashboard.Scope
 
 private val TABS = listOf("Movimientos", "Por categoría", "Por tarjeta")
 
@@ -123,7 +124,7 @@ fun TransactionsScreen(
             }
             ErrorText(state.error, Modifier.padding(horizontal = 16.dp))
             FilterBar(
-                cards = state.cards,
+                cards = state.cards.filter { !it.archived && (state.scope == Scope.BOTH || it.ownerId == userId) },
                 cardFilter = state.cardFilter,
                 sort = state.sort,
                 onCard = vm::setCardFilter,

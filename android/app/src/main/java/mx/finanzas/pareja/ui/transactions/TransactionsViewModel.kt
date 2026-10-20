@@ -79,7 +79,7 @@ class TransactionsViewModel(
     }
 
     fun setScope(scope: Scope) {
-        _state.update { it.copy(scope = scope) }
+        _state.update { it.copy(scope = scope, cardFilter = null) }
         publish()
     }
 
