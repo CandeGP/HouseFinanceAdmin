@@ -123,18 +123,19 @@ fun TransactionsScreen(
                 )
             }
             ErrorText(state.error, Modifier.padding(horizontal = 16.dp))
-            FilterBar(
-                cards = state.cards.filter { !it.archived && (state.scope == Scope.BOTH || it.ownerId == userId) },
-                cardFilter = state.cardFilter,
-                sort = state.sort,
-                onCard = vm::setCardFilter,
-                onSort = vm::setSort,
-            )
-
             TabRow(selectedTabIndex = tab) {
                 TABS.forEachIndexed { index, title ->
                     Tab(selected = tab == index, onClick = { tab = index }, text = { Text(title) })
                 }
+            }
+            if (tab == 0) {
+                FilterBar(
+                    cards = state.cards.filter { !it.archived && (state.scope == Scope.BOTH || it.ownerId == userId) },
+                    cardFilter = state.cardFilter,
+                    sort = state.sort,
+                    onCard = vm::setCardFilter,
+                    onSort = vm::setSort,
+                )
             }
 
             when {
