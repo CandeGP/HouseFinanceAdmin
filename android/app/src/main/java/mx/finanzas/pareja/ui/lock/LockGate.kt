@@ -25,7 +25,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * Muestra [content] solo cuando la app está desbloqueada. Si el bloqueo está activado, pide huella o
- * PIN al abrirla desde cero y al volver tras más de 30 segundos fuera. Con la app bloqueada no se dibuja
+ * PIN al abrirla desde cero y al volver tras más de 1 minuto fuera. Con la app bloqueada no se dibuja
  * nada de [content], así que ningún dato queda a la vista.
  */
 @Composable

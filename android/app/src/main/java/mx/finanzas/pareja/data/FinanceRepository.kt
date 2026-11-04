@@ -89,7 +89,20 @@ interface FinanceRepository {
 
     /** Estimación y estado de pago de varias tarjetas. La versión de Supabase lo trae en una sola consulta. */
     suspend fun cardSnapshots(cardIds: List<String>, ref: LocalDate): List<CardSnapshot> =
-        snapshotsOneByOne(cardIds, ref)
+        snapshotsOneByOne(cardIds, ref).withCredits(cardCreditsOrEmpty())
+
+    /** Adelantos y abonos a capital de todas las tarjetas del hogar, el más reciente primero. */
+    suspend fun cardCredits(): List<CardPayment> = emptyList()
+
+    /** Sin la migración de destinos en el servidor la consulta falla: el Resumen sigue sin descontar adelantos. */
+    suspend fun cardCreditsOrEmpty(): List<CardPayment> =
+        try {
+            cardCredits()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
 
     /** Gasto del mes calendario de [ref] frente al presupuesto de la tarjeta. */
     suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend?

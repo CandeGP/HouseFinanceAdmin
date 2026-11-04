@@ -257,7 +257,11 @@ internal fun CardDetailScreen(
                     items(payments, key = { it.id }) { payment ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             DetailRow(
-                                if (payment.method == PaymentMethod.CASH) "Efectivo" else "Transferencia",
+                                when (payment.destination) {
+                                    mx.finanzas.pareja.data.PaymentDestination.NEXT_CYCLE -> "Adelanto al siguiente corte"
+                                    mx.finanzas.pareja.data.PaymentDestination.CAPITAL -> "Abono a capital"
+                                    else -> if (payment.method == PaymentMethod.CASH) "Efectivo" else "Transferencia"
+                                },
                                 formatDateEs(localDate(payment.paidAt, zone)),
                                 formatMxn(payment.amount),
                                 modifier = Modifier.weight(1f).then(if (mine) Modifier.clickable { onEditPayment(payment) } else Modifier),

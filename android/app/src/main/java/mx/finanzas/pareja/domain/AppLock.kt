@@ -1,7 +1,7 @@
 package mx.finanzas.pareja.domain
 
 /** Tiempo fuera de la app a partir del cual se vuelve a pedir el desbloqueo. */
-const val LOCK_GRACE_MS = 30_000L
+const val LOCK_GRACE_MS = 60_000L
 
 /**
  * Si al abrir o volver a la app hay que pedir el desbloqueo.

@@ -282,12 +282,22 @@ data class CardPayment(
     @SerialName("household_id") val householdId: String,
     @SerialName("owner_id") val ownerId: String,
     @SerialName("card_id") val cardId: String,
-    @SerialName("cutoff_date") val cutoffDate: LocalDate,
+    /** Corte al que se aplica; null en un abono a capital, que no es de ningún corte. */
+    @SerialName("cutoff_date") val cutoffDate: LocalDate?,
     val amount: Double,
     @SerialName("paid_at") val paidAt: Instant,
     val method: PaymentMethod,
     val notes: String? = null,
+    val destination: PaymentDestination = PaymentDestination.CYCLE,
 )
+
+/** A dónde va un pago a tarjeta: el corte cerrado, un adelanto al ciclo abierto o un abono a capital (compras a meses). */
+@Serializable
+enum class PaymentDestination {
+    @SerialName("cycle") CYCLE,
+    @SerialName("next_cycle") NEXT_CYCLE,
+    @SerialName("capital") CAPITAL,
+}
 
 /** Quién prestó a quién: lent = yo presté · borrowed = me prestaron. */
 @Serializable
@@ -369,9 +379,10 @@ data class NewCardPayment(
     @SerialName("household_id") val householdId: String,
     @SerialName("owner_id") val ownerId: String,
     @SerialName("card_id") val cardId: String,
-    @SerialName("cutoff_date") val cutoffDate: LocalDate,
+    @SerialName("cutoff_date") val cutoffDate: LocalDate?,
     val amount: Double,
     @SerialName("paid_at") val paidAt: Instant,
     val method: PaymentMethod,
     val notes: String? = null,
+    val destination: PaymentDestination = PaymentDestination.CYCLE,
 )

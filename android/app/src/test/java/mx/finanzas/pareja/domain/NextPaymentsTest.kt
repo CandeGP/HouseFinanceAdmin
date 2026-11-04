@@ -117,9 +117,18 @@ class NextPaymentsTest {
     }
 
     @Test
-    fun `del 1 al 15 los pagos de otros meses y los de cero no cuentan`() {
-        val totals = quincenaTotals(listOf(pay(900.0, LocalDate(2026, 11, 5)), pay(0.0, LocalDate(2026, 10, 20))), early)
+    fun `del 1 al 15 los pagos de otros meses lejanos y los de cero no cuentan`() {
+        val totals = quincenaTotals(listOf(pay(900.0, LocalDate(2026, 12, 5)), pay(0.0, LocalDate(2026, 10, 20))), early)
         assertEquals(NO_QUINCENAS, totals)
+    }
+
+    @Test
+    fun `del 1 al 15 con la primera liquidada el primer bloque salta a la primera del mes que viene`() {
+        val totals = quincenaTotals(listOf(pay(900.0, LocalDate(2026, 11, 5)), pay(60.0, LocalDate(2026, 10, 25))), early)
+
+        assertEquals(LocalDate(2026, 11, 15), totals.nextFirstEnd)
+        assertEquals(Quincena(900.0, 1), totals.first.copy(payments = emptyList()))
+        assertEquals(Quincena(60.0, 1), totals.second.copy(payments = emptyList()))
     }
 
     @Test

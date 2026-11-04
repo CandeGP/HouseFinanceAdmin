@@ -14,6 +14,24 @@ data class CardSnapshot(
     val status: CardCycleStatus?,
 )
 
+/**
+ * Descuenta los pagos que no son del corte cerrado: un adelanto baja el pago del ciclo abierto (el de su corte) y
+ * un abono a capital baja lo que falta de las compras a meses. Nunca deja un total negativo.
+ */
+fun List<CardSnapshot>.withCredits(credits: List<CardPayment>): List<CardSnapshot> = map { snap ->
+    val estimate = snap.estimate ?: return@map snap
+    val mine = credits.filter { it.cardId == snap.cardId }
+    val advance = mine.filter { it.destination == PaymentDestination.NEXT_CYCLE && it.cutoffDate == estimate.cycleEnd }
+        .sumOf { it.amount }
+    val capital = mine.filter { it.destination == PaymentDestination.CAPITAL }.sumOf { it.amount }
+    snap.copy(
+        estimate = estimate.copy(
+            cycleTotal = (estimate.cycleTotal - advance).coerceAtLeast(0.0),
+            msiRemaining = (estimate.msiRemaining - capital).coerceAtLeast(0.0),
+        ),
+    )
+}
+
 /** Una consulta por tarjeta, en paralelo. Respaldo de [FinanceRepository.cardSnapshots] cuando no hay RPC única. */
 internal suspend fun FinanceRepository.snapshotsOneByOne(cardIds: List<String>, ref: LocalDate): List<CardSnapshot> =
     coroutineScope {

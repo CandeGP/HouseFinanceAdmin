@@ -23,6 +23,8 @@ import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.NewCardPayment
+import mx.finanzas.pareja.data.PaymentDestination
+import mx.finanzas.pareja.domain.splitPayment
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.CardBalanceCheck
 import mx.finanzas.pareja.data.NewCardBalanceCheck
@@ -54,6 +56,8 @@ data class CardsUiState(
     /** Cómo va el pago del último ciclo cerrado de cada tarjeta, y los pagos registrados en ese ciclo. */
     val statuses: Map<String, CardCycleStatus> = emptyMap(),
     val payments: Map<String, List<CardPayment>> = emptyMap(),
+    /** Corte del ciclo abierto de cada tarjeta: a ese corte se aplican los adelantos. */
+    val openCutoffs: Map<String, LocalDate> = emptyMap(),
     val paymentError: String? = null,
     val paymentSaved: Boolean = false,
     /** Lo que la app calcula que se debe en total por tarjeta (para compararlo con el banco). */
@@ -92,15 +96,22 @@ class CardsViewModel(
                 val snapshots = repo.cardSnapshots(active.map { it.id }, today)
                 val statuses = snapshots.mapNotNull { s -> s.status?.let { s.cardId to it } }.toMap()
                 val appDebts = snapshots.associate { it.cardId to debtTotal(it.estimate, it.status) }
-                val payments = statuses.filterValues { it.paidAmount > 0 }
+                val cyclePayments = statuses.filterValues { it.paidAmount > 0 }
                     .mapValues { (cardId, status) -> repo.cardPayments(cardId, status.cutoffDate) }
+                // Adelantos y abonos a capital van en la misma lista para poder revisarlos y borrarlos.
+                val credits = repo.cardCreditsOrEmpty().groupBy { it.cardId }
+                val payments = (cyclePayments.keys + credits.keys).associateWith { cardId ->
+                    (cyclePayments[cardId].orEmpty() + credits[cardId].orEmpty()).distinctBy { it.id }
+                }
+                val openCutoffs = snapshots.mapNotNull { s -> s.estimate?.let { s.cardId to it.cycleEnd } }.toMap()
                 // Si la tabla aún no existe en el servidor, la pantalla sigue funcionando sin la conciliación.
                 val checks = runCatching { repo.balanceChecks() }.getOrDefault(emptyList())
                     .groupBy { it.cardId }.mapValues { (_, list) -> list.first() }
                 _state.update {
                     it.copy(
                         cards = active, archived = archived, spend = spend, statuses = statuses,
-                        payments = payments, appDebts = appDebts, balanceChecks = checks, loading = false,
+                        payments = payments, openCutoffs = openCutoffs, appDebts = appDebts,
+                        balanceChecks = checks, loading = false,
                     )
                 }
             } catch (e: CancellationException) {
@@ -194,15 +205,31 @@ class CardsViewModel(
         if (card.ownerId != userId) return
         when (val result = draft.validate(today)) {
             is CardPaymentResult.Invalid -> _state.update { it.copy(paymentError = result.message, paymentSaved = false) }
-            is CardPaymentResult.Valid -> savePayment {
-                repo.addCardPayment(
-                    NewCardPayment(
-                        householdId = householdId, ownerId = userId, cardId = card.id,
-                        cutoffDate = status.cutoffDate, amount = result.amount,
-                        paidAt = paidInstant(result.date, today, Clock.System.now(), zone),
-                        method = result.method, notes = result.notes,
-                    ),
-                )
+            is CardPaymentResult.Valid -> {
+                val openCutoff = _state.value.openCutoffs[card.id]
+                val parts = splitPayment(result.amount, status.remaining, draft.excessTo)
+                if (openCutoff == null && parts.any { it.destination == PaymentDestination.NEXT_CYCLE }) {
+                    _state.update { it.copy(paymentError = "No se pudo calcular el siguiente corte", paymentSaved = false) }
+                    return
+                }
+                val paidAt = paidInstant(result.date, today, Clock.System.now(), zone)
+                savePayment {
+                    // Primero lo del corte cerrado y después el excedente.
+                    parts.forEach { part ->
+                        repo.addCardPayment(
+                            NewCardPayment(
+                                householdId = householdId, ownerId = userId, cardId = card.id,
+                                cutoffDate = when (part.destination) {
+                                    PaymentDestination.CYCLE -> status.cutoffDate
+                                    PaymentDestination.NEXT_CYCLE -> openCutoff
+                                    PaymentDestination.CAPITAL -> null
+                                },
+                                amount = part.amount, paidAt = paidAt,
+                                method = result.method, notes = result.notes, destination = part.destination,
+                            ),
+                        )
+                    }
+                }
             }
         }
     }

@@ -178,7 +178,7 @@ private fun LockCard() {
                 AppSwitch(checked = enabled, onCheckedChange = { change(it) })
             }
             Text(
-                "Pide tu huella o el PIN del teléfono al abrir la app y al volver después de 30 segundos. " +
+                "Pide tu huella o el PIN del teléfono al abrir la app y al volver después de 1 minuto." +
                     "Los avisos y la captura de cobros siguen funcionando con la app bloqueada.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

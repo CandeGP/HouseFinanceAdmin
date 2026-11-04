@@ -217,12 +217,19 @@ class SupabaseFinanceRepository(private val client: SupabaseClient, private val 
                 "card_snapshots",
                 buildJsonObject { put("p_ref", ref.toString()) },
             ).decodeList<CardSnapshotRow>().filter { it.cardId in cardIds }.map { it.toSnapshot() }
+                .withCredits(cardCreditsOrEmpty())
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             // Si la función aún no está en el servidor (migración pendiente), el Resumen sigue funcionando.
-            snapshotsOneByOne(cardIds, ref)
+            snapshotsOneByOne(cardIds, ref).withCredits(cardCreditsOrEmpty())
         }
+
+    override suspend fun cardCredits(): List<CardPayment> =
+        client.postgrest.from("card_payments").select {
+            filter { neq("destination", "cycle") }
+            order("paid_at", Order.DESCENDING)
+        }.decodeList<CardPayment>()
 
     override suspend fun cardMonthSpend(cardId: String, ref: LocalDate): MonthSpend? =
         client.postgrest.rpc(

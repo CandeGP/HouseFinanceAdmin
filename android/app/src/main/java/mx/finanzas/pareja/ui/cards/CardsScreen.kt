@@ -510,6 +510,38 @@ private fun CardPaymentDialog(
                     supportingText = error?.let { { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                val typed = mx.finanzas.pareja.domain.parseAmount(draft.amountText)
+                val excess = if (editing == null && typed != null) typed - status.remaining.coerceAtLeast(0.0) else 0.0
+                if (excess > 0.005) {
+                    val next = mx.finanzas.pareja.data.PaymentDestination.NEXT_CYCLE
+                    val capital = mx.finanzas.pareja.data.PaymentDestination.CAPITAL
+                    Text(
+                        if (status.remaining > 0) {
+                            "Sobran ${mx.finanzas.pareja.domain.formatMxn(excess)} del corte. ¿A dónde van?"
+                        } else {
+                            "El corte ya está pagado: ${mx.finanzas.pareja.domain.formatMxn(excess)} de más. ¿A dónde van?"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = draft.excessTo == next,
+                            onClick = { draft = draft.copy(excessTo = next) },
+                            label = { Text("Siguiente corte") },
+                        )
+                        FilterChip(
+                            selected = draft.excessTo == capital,
+                            onClick = { draft = draft.copy(excessTo = capital) },
+                            label = { Text("Abono a capital") },
+                        )
+                    }
+                    Text(
+                        if (draft.excessTo == capital) "Baja lo que falta de tus compras a meses."
+                        else "Baja lo que pagarás en el siguiente corte de la tarjeta.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = draft.method == PaymentMethod.TRANSFER,

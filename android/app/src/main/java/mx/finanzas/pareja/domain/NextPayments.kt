@@ -106,20 +106,22 @@ private fun quincenaOf(list: List<NextPayment>) =
  * Suma lo que vence por quincena. Del 1 al 15 del mes: la 1ª y la 2ª de este mes. Pasado el 15, la 1ª ya
  * no se puede pagar a tiempo, así que el primer bloque pasa a ser la 1ª quincena del mes que viene y el
  * segundo junta todo lo que falta de este mes (incluido lo vencido). Los pagos de meses posteriores no cuentan.
+ * Si del 1 al 15 ya no queda nada por pagar en la 1ª, el primer bloque salta también a la 1ª del mes que viene.
  */
 fun quincenaTotals(obligations: List<NextPayment>, today: LocalDate): QuincenaTotals {
     val monthEnd = monthBounds(today.year, today.monthNumber).second
     val owed = obligations.filter { it.amount > 0 }
+    val nextStart = monthEnd.plus(1, DateTimeUnit.DAY)
+    val nextFirstEnd = LocalDate(nextStart.year, nextStart.month, QUINCENA_SPLIT_DAY)
+    val nextFirst = owed.filter { it.dueDate in nextStart..nextFirstEnd }
     if (today.dayOfMonth <= QUINCENA_SPLIT_DAY) {
         val (first, second) = owed.filter { it.dueDate <= monthEnd }
             .partition { it.dueDate.dayOfMonth <= QUINCENA_SPLIT_DAY }
+        // Todo liquidado en la 1ª: se muestra lo siguiente en vez de dejarla en 0.
+        if (first.isEmpty() && nextFirst.isNotEmpty()) {
+            return QuincenaTotals(quincenaOf(nextFirst), quincenaOf(second), nextFirstEnd)
+        }
         return QuincenaTotals(quincenaOf(first), quincenaOf(second))
     }
-    val nextStart = monthEnd.plus(1, DateTimeUnit.DAY)
-    val nextFirstEnd = LocalDate(nextStart.year, nextStart.month, QUINCENA_SPLIT_DAY)
-    return QuincenaTotals(
-        first = quincenaOf(owed.filter { it.dueDate in nextStart..nextFirstEnd }),
-        second = quincenaOf(owed.filter { it.dueDate <= monthEnd }),
-        nextFirstEnd = nextFirstEnd,
-    )
+    return QuincenaTotals(quincenaOf(nextFirst), quincenaOf(owed.filter { it.dueDate <= monthEnd }), nextFirstEnd)
 }

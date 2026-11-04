@@ -9,6 +9,7 @@ import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import mx.finanzas.pareja.data.CardCycleStatus
 import mx.finanzas.pareja.data.CardPayStatus
+import mx.finanzas.pareja.data.PaymentDestination
 import mx.finanzas.pareja.data.PaymentMethod
 
 /** Formulario de "Registrar pago" de una tarjeta: monto, forma de pago, nota y fecha (null = hoy). */
@@ -17,6 +18,8 @@ data class CardPaymentDraft(
     val method: PaymentMethod = PaymentMethod.TRANSFER,
     val notes: String = "",
     val date: LocalDate? = null,
+    /** A dónde va lo que sobre del corte cerrado (adelanto al siguiente corte o abono a capital). */
+    val excessTo: PaymentDestination = PaymentDestination.NEXT_CYCLE,
 ) {
     fun validate(today: LocalDate): CardPaymentResult {
         val amount = parseAmount(amountText) ?: return CardPaymentResult.Invalid("Monto inválido")
@@ -35,6 +38,25 @@ sealed interface CardPaymentResult {
 
     data class Invalid(val message: String) : CardPaymentResult
 }
+
+/** Una parte de un pago: cuánto y a dónde va. */
+data class PaymentPart(val amount: Double, val destination: PaymentDestination)
+
+/**
+ * Reparte un pago: primero cubre lo que falta del corte cerrado ([remaining]); lo que sobre va a [excessTo].
+ * Con el corte ya pagado ([remaining] = 0) todo el monto es excedente.
+ */
+fun splitPayment(amount: Double, remaining: Double, excessTo: PaymentDestination): List<PaymentPart> {
+    val toCycle = minOf(amount, remaining.coerceAtLeast(0.0))
+    val excess = amount - toCycle
+    return listOfNotNull(
+        PaymentPart(toCycle, PaymentDestination.CYCLE).takeIf { toCycle > 0 },
+        PaymentPart(excess, excessTo).takeIf { excess > EXCESS_EPSILON },
+    )
+}
+
+/** Menos que esto es redondeo, no un excedente. */
+private const val EXCESS_EPSILON = 0.005
 
 private const val NOON_HOUR = 12
 
