@@ -12,14 +12,12 @@ import kotlinx.datetime.LocalDate
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.FinanceRepository
-import mx.finanzas.pareja.data.MsiInstallment
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.TxSort
 import mx.finanzas.pareja.domain.filterAndSort
 import mx.finanzas.pareja.domain.monthBounds
 import mx.finanzas.pareja.ui.dashboard.Scope
-import mx.finanzas.pareja.ui.installments.INSTALLMENT_HORIZON_MONTHS
 
 data class TransactionsUiState(
     val year: Int,
@@ -28,8 +26,6 @@ data class TransactionsUiState(
     val items: List<Transaction> = emptyList(),
     val cards: List<Card> = emptyList(),
     val categories: List<Category> = emptyList(),
-    /** Mensualidades de compras a meses que se pagan en el mes elegido (según el alcance). */
-    val installments: List<MsiInstallment> = emptyList(),
     /** Filtro por tarjeta (null = todas) y orden de los movimientos; por defecto, por fecha. */
     val cardFilter: String? = null,
     val sort: TxSort = TxSort.DATE,
@@ -47,25 +43,16 @@ class TransactionsViewModel(
 
     private var monthItems: List<Transaction> = emptyList()
 
-    /** Calendario completo de mensualidades; no cambia al moverse de mes, así que se pide una sola vez por carga. */
-    private var schedule: List<MsiInstallment> = emptyList()
-
     init {
         load()
     }
 
-    fun load() = load(refreshSchedule = true)
-
-    private fun load(refreshSchedule: Boolean) {
+    fun load() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             try {
                 val (from, to) = monthBounds(_state.value.year, _state.value.month)
                 monthItems = repo.transactions(from, to)
-                // Sin el calendario (por ejemplo, sin conexión a esa consulta) Gastos sigue funcionando.
-                if (refreshSchedule) {
-                    schedule = runCatching { repo.msiSchedule(today, INSTALLMENT_HORIZON_MONTHS) }.getOrDefault(emptyList())
-                }
                 val cards = repo.cards()
                 val categories = repo.categories()
                 _state.update { it.copy(cards = cards, categories = categories, loading = false) }
@@ -114,17 +101,12 @@ class TransactionsViewModel(
     private fun shiftMonth(delta: Int) {
         val index = _state.value.year * 12 + (_state.value.month - 1) + delta
         _state.update { it.copy(year = index / 12, month = index % 12 + 1) }
-        load(refreshSchedule = false)
+        load()
     }
 
     private fun publish() {
         val scope = _state.value.scope
         val visible = if (scope == Scope.MINE) monthItems.filter { it.ownerId == userId } else monthItems
-        val myCards = _state.value.cards.filter { it.ownerId == userId }.map { it.id }.toSet()
-        val installments = schedule
-            .filter { it.dueDate.year == _state.value.year && it.dueDate.monthNumber == _state.value.month }
-            .filter { scope == Scope.BOTH || it.cardId in myCards }
-            .sortedByDescending { it.amount }
-        _state.update { it.copy(items = filterAndSort(visible, it.cardFilter, it.sort), installments = installments) }
+        _state.update { it.copy(items = filterAndSort(visible, it.cardFilter, it.sort)) }
     }
 }

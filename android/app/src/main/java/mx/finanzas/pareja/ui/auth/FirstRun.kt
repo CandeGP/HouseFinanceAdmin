@@ -257,7 +257,7 @@ private fun DoneStep(name: String, onFinish: (openTutorials: Boolean) -> Unit) {
             ) {
                 Text("El botón «+»", color = Color(0xFF1F1747), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                 Text(
-                    "Un toque registra un cobro. Mantenlo presionado para pago de tarjeta, escanear ticket o préstamo, " +
+                    "Un toque registra un gasto. Mantenlo presionado para pago de tarjeta, escanear ticket o préstamo, " +
                         "y desliza hasta la opción para elegirla.",
                     color = Color(0xFF1F1747),
                     fontSize = 13.5.sp,

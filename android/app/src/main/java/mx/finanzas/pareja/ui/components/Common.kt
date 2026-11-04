@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -61,7 +60,7 @@ fun ScopeToggle(scope: Scope, onChange: (Scope) -> Unit, modifier: Modifier = Mo
     }
 }
 
-/** Una mitad de la píldora Míos/Ambos: la elegida lleva fondo tenue y una palomita. */
+/** Una mitad de la píldora Míos/Ambos: la elegida lleva fondo más marcado y letra gruesa (sin palomita, para ganar espacio). */
 @Composable
 private fun ScopeOption(label: String, selected: Boolean, onClick: () -> Unit) {
     val ink = MaterialTheme.colorScheme.onSurface
@@ -74,7 +73,6 @@ private fun ScopeOption(label: String, selected: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (selected) Icon(Icons.Filled.Check, contentDescription = null, tint = ink, modifier = Modifier.size(14.dp))
         Text(
             label,
             fontSize = 13.sp,

@@ -41,6 +41,62 @@ class TransactionFormViewModelTest {
     }
 
     @Test
+    fun `las sugerencias salen de mis gastos de los ultimos 90 dias`() {
+        repo.cardList = listOf(card("mine"), card("other"))
+        repo.categoryList = listOf(Category("cat-gas", "Gasolina", "fuel"), Category("cat-cafe", "Cafeterías", "coffee"))
+        val recent = LocalDate(2026, 10, 1)
+        repo.txList += tx("a", 10.0, cardId = "other").copy(categoryId = "cat-cafe", occurredAt = recent)
+        repo.txList += tx("b", 10.0, cardId = "other").copy(categoryId = "cat-cafe", occurredAt = recent)
+        repo.txList += tx("c", 10.0, cardId = "mine").copy(categoryId = "cat-gas", occurredAt = recent)
+        // Más viejo de 90 días y de la pareja: no cuentan.
+        repo.txList += tx("d", 10.0, cardId = "mine").copy(categoryId = "cat-gas", occurredAt = LocalDate(2026, 1, 1))
+        repo.txList += tx("e", 10.0, cardId = "mine", ownerId = "u2").copy(categoryId = "cat-gas", occurredAt = recent)
+
+        val state = vm().state.value
+        assertEquals(listOf("other", "mine"), state.topCardIds)
+        assertEquals("cat-cafe", state.topCategoryIds.first())
+    }
+
+    private fun withOxxoHistory() {
+        repo.txList += tx("ox", 50.0, cardId = "mine").copy(merchant = "OXXO", categoryId = "cat-gas", occurredAt = LocalDate(2026, 10, 1))
+    }
+
+    @Test
+    fun `al escribir un comercio conocido completa categoria y tarjeta vacias`() {
+        withOxxoHistory()
+        val vm = vm()
+        vm.onDraftChange(vm.state.value.draft.copy(merchant = "oxxo"))
+
+        val state = vm.state.value
+        assertEquals("cat-gas", state.draft.categoryId)
+        assertEquals("mine", state.draft.cardId)
+        assertNotNull(state.suggestionNote)
+    }
+
+    @Test
+    fun `la sugerencia no pisa lo que ya elegiste`() {
+        withOxxoHistory()
+        repo.categoryList = listOf(Category("cat-gas", "Gasolina"), Category("cat-super", "Súper"))
+        val vm = vm()
+        vm.onDraftChange(vm.state.value.draft.copy(categoryId = "cat-super"))
+        vm.onDraftChange(vm.state.value.draft.copy(merchant = "OXXO"))
+
+        assertEquals("cat-super", vm.state.value.draft.categoryId)
+        assertEquals("mine", vm.state.value.draft.cardId)
+    }
+
+    @Test
+    fun `al editar un gasto no se sugiere nada`() {
+        withOxxoHistory()
+        repo.txList += tx("edit", 10.0, cardId = null).copy(merchant = "Otro", occurredAt = LocalDate(2026, 10, 2))
+        val vm = vm(editingId = "edit")
+        vm.onDraftChange(vm.state.value.draft.copy(merchant = "OXXO"))
+
+        assertNull(vm.state.value.draft.categoryId)
+        assertNull(vm.state.value.suggestionNote)
+    }
+
+    @Test
     fun `el borrador inicia con la fecha de hoy y contado`() {
         val draft = vm().state.value.draft
         assertEquals(today, draft.date)

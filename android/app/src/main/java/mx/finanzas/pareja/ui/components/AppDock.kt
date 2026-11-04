@@ -151,7 +151,7 @@ fun AppDock(
                 .onGloballyPositioned { fabOrigin = it.positionInWindow() }
                 .semantics {
                     contentDescription = "Agregar"
-                    onClick("Nuevo cobro") { onAdd(); true }
+                    onClick("Nuevo gasto") { onAdd(); true }
                     onLongClick("Más opciones") { onAddLongPress(); true }
                     customActions = addActions.map { action ->
                         CustomAccessibilityAction(action.label) { action.onSelect(); true }

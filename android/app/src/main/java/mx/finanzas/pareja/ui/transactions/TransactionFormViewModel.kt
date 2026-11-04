@@ -8,7 +8,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
+import mx.finanzas.pareja.domain.SUGGESTION_LOOKBACK_DAYS
+import mx.finanzas.pareja.domain.TOP_SUGGESTIONS
+import mx.finanzas.pareja.domain.cardLabel
+import mx.finanzas.pareja.domain.mostUsedIds
+import mx.finanzas.pareja.domain.suggestForMerchant
+import mx.finanzas.pareja.domain.suggestedCategoryIds
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.FinanceRepository
@@ -38,6 +46,11 @@ data class FormUiState(
     val message: String? = null,
     /** Resumen de lo que se leyó de una imagen cargada (para que la persona lo revise). */
     val receiptNote: String? = null,
+    /** Lo que más usas (últimos 90 días): salen de entrada; lo demás va detrás de «Ver todas» / «+N». */
+    val topCategoryIds: List<String> = emptyList(),
+    val topCardIds: List<String> = emptyList(),
+    /** Aviso de lo que se completó solo a partir del último gasto en el mismo comercio. */
+    val suggestionNote: String? = null,
 )
 
 class TransactionFormViewModel(
@@ -45,8 +58,11 @@ class TransactionFormViewModel(
     private val userId: String,
     private val householdId: String,
     private val editingId: String?,
-    today: LocalDate,
+    val today: LocalDate,
 ) : ViewModel() {
+    /** Tus gastos recientes (lo más nuevo primero), para sugerir categoría y tarjeta por comercio. */
+    private var history: List<Transaction> = emptyList()
+
     private val _state = MutableStateFlow(
         FormUiState(
             draft = TransactionDraft(
@@ -64,7 +80,23 @@ class TransactionFormViewModel(
     }
 
     fun onDraftChange(draft: TransactionDraft) {
-        _state.update { it.copy(draft = draft, errors = emptyMap()) }
+        _state.update { s ->
+            val merchantChanged = draft.merchant != s.draft.merchant
+            val hit = if (merchantChanged && !isEditing) suggestForMerchant(draft.merchant, history) else null
+            // Solo completa lo que está vacío: nunca pisa lo que ya elegiste.
+            val category = hit?.categoryId?.takeIf { draft.categoryId == null }?.let { id -> s.categories.firstOrNull { it.id == id } }
+            val card = hit?.cardId?.takeIf { draft.cardId == null }?.let { id -> s.cards.firstOrNull { it.id == id && !it.frozen } }
+            val filled = draft.copy(categoryId = category?.id ?: draft.categoryId, cardId = card?.id ?: draft.cardId)
+            val note = when {
+                category != null || card != null -> {
+                    val parts = listOfNotNull(category?.name?.let { "categoría $it" }, card?.let { "tarjeta ${cardLabel(it)}" })
+                    "Completé ${parts.joinToString(" y ")} como en tu último gasto en ${hit?.merchant?.trim()}. Cámbialas si no aplica."
+                }
+                merchantChanged -> null
+                else -> s.suggestionNote
+            }
+            s.copy(draft = filled, errors = emptyMap(), suggestionNote = note)
+        }
     }
 
     /**
@@ -126,8 +158,17 @@ class TransactionFormViewModel(
                 val cards = repo.cards().filter { it.ownerId == userId && !it.archived }
                 val categories = repo.categories()
                 val existing = editingId?.let { repo.transaction(it) }
+                val recent = recentOwnTransactions()
+                history = recent
+                val usableIds = cards.filter { !it.frozen }.map { it.id } // las congeladas no se ofrecen de entrada
+                val topCards = mostUsedIds(recent.map { it.cardId }).filter { it in usableIds }
+                    .let { used -> (used + usableIds).distinct().take(TOP_SUGGESTIONS) }
+                val topCategories = suggestedCategoryIds(recent.map { it.categoryId }, categories.map { it.id to it.icon })
                 _state.update { state ->
-                    val base = state.copy(cards = cards, categories = categories, loading = false)
+                    val base = state.copy(
+                        cards = cards, categories = categories, loading = false,
+                        topCardIds = topCards, topCategoryIds = topCategories,
+                    )
                     when {
                         editingId != null && existing == null ->
                             base.copy(readOnly = true, message = "No se encontró el gasto")
@@ -147,6 +188,22 @@ class TransactionFormViewModel(
                 _state.update { it.copy(loading = false, message = userMessage(e)) }
             }
         }
+    }
+
+    /** Tus gastos de los últimos 90 días, lo más reciente primero. Si falla, el formulario sigue sin sugerencias. */
+    private suspend fun recentOwnTransactions(): List<Transaction> = try {
+        repo.transactions(today.minus(SUGGESTION_LOOKBACK_DAYS, DateTimeUnit.DAY), today)
+            .filter { it.ownerId == userId }
+            .sortedByDescending { it.occurredAt }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    /** Muestra un aviso en el formulario (por ejemplo, si el teléfono no tiene cámara). */
+    fun showMessage(text: String) {
+        _state.update { it.copy(message = text) }
     }
 
     private fun persist(v: ValidDraft) {

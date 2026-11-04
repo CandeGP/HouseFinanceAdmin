@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,7 +79,15 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 
 /** Ficha elegible del mockup: píldora de 36 de alto; la elegida lleva borde de color y fondo tenue. */
 @Composable
-fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun SelectChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    /** Emoji decorativo antes del texto; el lector de pantalla lo omite y dice solo [label]. */
+    leading: String? = null,
+) {
     val primary = MaterialTheme.colorScheme.primary
     val tokens = AppTheme.tokens
     androidx.compose.material3.Surface(
@@ -89,12 +98,18 @@ fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
         color = if (selected) primary.copy(alpha = 0.25f) else tokens.glass,
         border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) primary else tokens.glassBorder),
     ) {
-        Text(
-            label,
-            fontSize = 13.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-        )
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            leading?.let { Text(it, fontSize = 14.sp, modifier = Modifier.clearAndSetSemantics { }) }
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
     }
 }

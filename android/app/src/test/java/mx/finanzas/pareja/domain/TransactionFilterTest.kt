@@ -26,5 +26,17 @@ class TransactionFilterTest {
     fun `menor gasto ordena de menor a mayor`() = assertEquals(listOf("a", "c", "d", "b"), ids(null, TxSort.LOWEST))
 
     @Test
+    fun `el total por dia suma todas las tarjetas y solo lo confirmado`() {
+        val day = LocalDate(2026, 11, 4)
+        val list = listOf(
+            tx("x", 100.0, cardId = "c1", date = day),
+            tx("y", 50.0, cardId = "c2", date = day),
+            tx("z", 999.0, date = day, status = mx.finanzas.pareja.data.TxStatus.PENDING_REVIEW),
+            tx("w", 20.0, date = LocalDate(2026, 11, 3)),
+        )
+        assertEquals(mapOf(day to 150.0, LocalDate(2026, 11, 3) to 20.0), dayTotals(list))
+    }
+
+    @Test
     fun `filtra por tarjeta y conserva el orden`() = assertEquals(listOf("c", "d", "a"), ids("c1", TxSort.DATE))
 }

@@ -297,7 +297,7 @@ internal fun CardDetailScreen(
             GradientButton(
                 onClick = onPay,
                 modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp, top = 4.dp),
-            ) { Text("Registrar pago") }
+            ) { Text("Pagar tarjeta") }
         }
     }
 }

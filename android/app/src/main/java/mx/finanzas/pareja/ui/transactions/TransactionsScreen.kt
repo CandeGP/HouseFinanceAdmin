@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Home
@@ -57,6 +58,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,17 +73,16 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.Card as CardModel
-import mx.finanzas.pareja.data.MsiInstallment
 import mx.finanzas.pareja.data.PaymentMode
 import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TxStatus
 import mx.finanzas.pareja.domain.SpendingSlice
 import mx.finanzas.pareja.domain.TxSort
 import mx.finanzas.pareja.domain.cardLabel
+import mx.finanzas.pareja.domain.dayTotals
 import mx.finanzas.pareja.domain.formatDayMonthEs
 import mx.finanzas.pareja.domain.formatMonthEs
 import mx.finanzas.pareja.domain.formatMxn
-import mx.finanzas.pareja.domain.spendingByCard
 import mx.finanzas.pareja.domain.spendingByCategory
 import mx.finanzas.pareja.ui.AppTheme
 import mx.finanzas.pareja.ui.components.Amount
@@ -88,10 +90,11 @@ import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.components.GlassCard
 import mx.finanzas.pareja.ui.components.MonthSummaryCard
+import mx.finanzas.pareja.ui.components.ScopeToggle
 import mx.finanzas.pareja.ui.components.UsageBar
 import mx.finanzas.pareja.ui.dashboard.Scope
 
-private val VIEWS = listOf("Movimientos", "Por categoría", "Por tarjeta")
+private val VIEWS = listOf("Movimientos", "Por categoría")
 
 @Composable
 fun TransactionsScreen(
@@ -111,6 +114,7 @@ fun TransactionsScreen(
     val cardsById = remember(state.cards) { state.cards.associateBy { it.id } }
     val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
     val monthTotal = state.items.filter { it.status == TxStatus.CONFIRMED }.sumOf { it.amount }
+    val totalsByDay = remember(state.items) { dayTotals(state.items) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -142,7 +146,7 @@ fun TransactionsScreen(
             }
 
             when {
-                state.items.isEmpty() && state.installments.isEmpty() && !state.loading ->
+                state.items.isEmpty() && !state.loading ->
                     EmptyState(
                         title = "Sin gastos este mes",
                         subtitle = "Registra un gasto con el botón +.",
@@ -151,18 +155,12 @@ fun TransactionsScreen(
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (state.installments.isNotEmpty()) {
-                        item(key = "installments-header") { DayLabel("MENSUALIDADES PROGRAMADAS") }
-                        items(state.installments, key = { "inst-${it.transactionId}-${it.dueDate}" }) { inst ->
-                            ScheduledInstallmentRow(inst, cardsById[inst.cardId])
-                        }
-                    }
                     // Agrupar por día solo tiene sentido ordenado por fecha; con otro orden va una lista corrida.
                     var lastDay: LocalDate? = null
                     state.items.forEach { tx ->
                         if (state.sort == TxSort.DATE && tx.occurredAt != lastDay) {
                             val day = tx.occurredAt
-                            item(key = "day-$day") { DayLabel(dayLabel(day, today)) }
+                            item(key = "day-$day") { DayLabel(dayLabel(day, today), total = totalsByDay[day]) }
                         } else if (state.sort != TxSort.DATE && lastDay == null) {
                             item(key = "movements-header") { DayLabel("MOVIMIENTOS") }
                         }
@@ -180,8 +178,7 @@ fun TransactionsScreen(
                         }
                     }
                 }
-                tab == 1 -> SliceList(spendingByCategory(state.items, state.categories))
-                else -> SliceList(spendingByCard(state.items, state.cards))
+                else -> SliceList(spendingByCategory(state.items, state.categories))
             }
         }
     }
@@ -221,7 +218,11 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit, dr
     }
 }
 
+/** Alto de la píldora Míos/Ambos (36 + 4 + 4 de margen); los filtros se centran contra ella. */
+private val SCOPE_TOGGLE_HEIGHT = 44.dp
+
 /** Míos / Ambos y, en la lista, el filtro por tarjeta y el orden (por defecto, por fecha). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterRow(
     scope: Scope,
@@ -235,15 +236,16 @@ private fun FilterRow(
 ) {
     var cardMenu by remember { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 12.dp),
+    // FlowRow: si no caben (letra grande, nombre de tarjeta largo) bajan a otra línea en vez de salirse de la pantalla.
+    FlowRow(
+        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterPill("Míos", selected = scope == Scope.MINE, onClick = { onScope(Scope.MINE) })
-        FilterPill("Ambos", selected = scope == Scope.BOTH, onClick = { onScope(Scope.BOTH) })
+        ScopeToggle(scope, onScope)
         if (showListFilters) {
-            Box {
-                FilterPill("Tarjeta: " + (cards.firstOrNull { it.id == cardFilter }?.name ?: "todas"), selected = false, onClick = { cardMenu = true }, dropdown = true)
+            Box(Modifier.height(SCOPE_TOGGLE_HEIGHT), contentAlignment = Alignment.CenterStart) {
+                FilterPill(cards.firstOrNull { it.id == cardFilter }?.name ?: "Tarjeta", selected = cardFilter != null, onClick = { cardMenu = true }, dropdown = true)
                 DropdownMenu(expanded = cardMenu, onDismissRequest = { cardMenu = false }) {
                     DropdownMenuItem(text = { Text("Todas") }, onClick = { onCard(null); cardMenu = false })
                     cards.forEach { card ->
@@ -251,8 +253,8 @@ private fun FilterRow(
                     }
                 }
             }
-            Box {
-                FilterPill("Orden: " + sort.label.lowercase(), selected = false, onClick = { sortMenu = true }, dropdown = true)
+            Box(Modifier.height(SCOPE_TOGGLE_HEIGHT), contentAlignment = Alignment.CenterStart) {
+                FilterPill(if (sort == TxSort.DATE) "Orden" else sort.label, selected = sort != TxSort.DATE, onClick = { sortMenu = true }, dropdown = true)
                 DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                     TxSort.entries.forEach { option ->
                         DropdownMenuItem(text = { Text(option.label) }, onClick = { onSort(option); sortMenu = false })
@@ -263,16 +265,28 @@ private fun FilterRow(
     }
 }
 
+/** Encabezado de un día con lo que se gastó en él (suma de todas las tarjetas) al lado contrario. */
 @Composable
-private fun DayLabel(text: String) {
-    Text(
-        text,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.sp,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-        modifier = Modifier.padding(start = 2.dp, top = 10.dp),
-    )
+private fun DayLabel(text: String, total: Double? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp, top = 10.dp)
+            // Un solo encabezado para el lector de pantalla: «Hoy, total $938.30».
+            .semantics(mergeDescendants = true) {
+                heading()
+                if (total != null) contentDescription = "${text.lowercase()}, total ${formatMxn(total)}"
+            },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+        )
+        total?.let { Text(formatMxn(it), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+    }
 }
 
 private fun dayLabel(day: LocalDate, today: LocalDate): String = when (day) {
@@ -303,37 +317,6 @@ private fun IconTile(icon: ImageVector, tint: Color) {
         Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(tint.copy(alpha = 0.22f)),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp)) }
-}
-
-/** Mensualidad futura de una compra a meses: no es un gasto nuevo, es lo que toca pagar ese mes. */
-@Composable
-private fun ScheduledInstallmentRow(item: MsiInstallment, card: CardModel?) {
-    GlassCard(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            IconTile(Icons.Outlined.CalendarMonth, AppTheme.tokens.chart[3])
-            Column(Modifier.weight(1f)) {
-                Text(item.merchant, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(
-                    "Vence ${formatDayMonthEs(item.dueDate)}" + (card?.let { " · ${cardLabel(it)}" } ?: ""),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "MSI · mensualidad ${item.number} de ${item.installments}" + if (item.isLast) " · última" else "",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Text(formatMxn(item.amount), fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        }
-    }
 }
 
 /** Un gasto: ícono de su categoría, comercio, tarjeta y monto. Tocar edita; mantener presionado elimina. */
@@ -390,7 +373,11 @@ private fun TransactionRow(
                     Text(tx.notes, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                 }
             }
-            Text("-${formatMxn(tx.amount)}", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            // Sin el «−» (en Gastos todo es gasto); el lector de pantalla lo dice con palabras.
+            Text(
+                formatMxn(tx.amount), fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { contentDescription = "gasto de ${formatMxn(tx.amount)}" },
+            )
         }
     }
 }

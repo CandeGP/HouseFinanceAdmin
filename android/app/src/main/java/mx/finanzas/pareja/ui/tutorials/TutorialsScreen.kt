@@ -51,7 +51,7 @@ data class Tutorial(val id: String, val title: String, val summary: String, val 
 private val TUTORIALS = listOf(
     Tutorial(
         id = "cobro",
-        title = "Registrar un cobro",
+        title = "Registrar un gasto",
         summary = "Anota un gasto en segundos.",
         steps = listOf(
             "Toca el botón + una sola vez.",
@@ -63,10 +63,10 @@ private val TUTORIALS = listOf(
     Tutorial(
         id = "ticket",
         title = "Escanear un ticket",
-        summary = "Llena el cobro a partir de una foto o captura.",
+        summary = "Llena el gasto a partir de una foto o captura.",
         steps = listOf(
             "Mantén presionado el botón + hasta que aparezcan las opciones.",
-            "Elige Escanear ticket y selecciona la imagen.",
+            "Elige Escanear ticket, o toca la cámara dentro de Nuevo gasto, y escoge tomar una foto o la galería.",
             "Revisa los datos que se llenaron solos y corrige lo que haga falta.",
             "Guarda. La imagen se lee en tu teléfono y no se sube.",
         ),
@@ -88,7 +88,7 @@ private val TUTORIALS = listOf(
         summary = "Registra el abono para que tu saldo se actualice.",
         steps = listOf(
             "Mantén presionado el botón + y elige Pago de tarjeta, o entra a Tarjetas.",
-            "En la tarjeta que pagaste, toca Registrar pago.",
+            "En la tarjeta que pagaste, toca Pagar tarjeta.",
             "Pon el monto, el método y la fecha.",
             "Guarda. El corte queda marcado como pagado.",
         ),
