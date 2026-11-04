@@ -12,7 +12,7 @@ export function Card({
   style?: CSSProperties;
 }) {
   return (
-    <div className={`rounded-xl bg-card p-6 shadow-card ${className}`} style={style}>
+    <div className={`rounded-3xl border border-line bg-card p-6 shadow-card backdrop-blur ${className}`} style={style}>
       {children}
     </div>
   );
@@ -52,7 +52,7 @@ export function Bar({ pct }: { pct: number }) {
   const width = Math.max(0, Math.min(100, pct));
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-mist">
-      <div className="h-full rounded-full bg-steel" style={{ width: `${width}%` }} />
+      <div className="h-full rounded-full" style={{ width: `${width}%`, background: "var(--accent-grad)" }} />
     </div>
   );
 }
@@ -67,6 +67,6 @@ export function PageTitle({ title, subtitle }: { title: string; subtitle?: strin
 }
 
 export const primaryButton =
-  "rounded-full bg-ink px-4 py-3 text-base font-semibold text-canvas shadow-btn disabled:opacity-50";
+  "rounded-full px-4 py-3 text-base font-semibold text-white shadow-btn [background:var(--accent-grad)] disabled:opacity-50";
 export const fieldClass =
-  "w-full rounded-xl border border-line bg-card px-4 py-3 text-base outline-none focus:border-accent";
+  "w-full rounded-2xl border border-line bg-card px-4 py-3.5 text-base text-ink outline-none placeholder:text-smoke focus:border-accent";

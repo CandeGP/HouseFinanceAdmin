@@ -41,6 +41,8 @@ export default function Resumen() {
   const msiLeft = estimates.reduce((sum, e) => sum + e.est.msi_remaining, 0);
   const nextDue = [...estimates].sort((a, b) => a.est.due_date.localeCompare(b.est.due_date))[0];
   const today = todayIso();
+  // La quincena en curso (días 1 al 15 la 1ª; después la 2ª) va en amarillo, igual que en la app.
+  const firstActive = Number(today.slice(8, 10)) <= 15;
   const quincenas = quincenaTotals(
     cards.flatMap((c) => paymentObligations(finance.estimates[c.id], finance.payStatus[c.id], today)),
     today,
@@ -74,8 +76,9 @@ export default function Resumen() {
           title={quincenas.nextFirstEnd ? "Próximo mes a pagar 1ª quincena" : "A pagar 1ª quincena"}
           range={quincenas.nextFirstEnd ? `Vence del 1 al ${dayLabel(quincenas.nextFirstEnd)}` : "Vence del 1 al 15"}
           quincena={quincenas.first}
+          highlight={firstActive}
         />
-        <QuincenaCard title="A pagar 2ª quincena" range="Vence del 16 a fin de mes" quincena={quincenas.second} highlight />
+        <QuincenaCard title="A pagar 2ª quincena" range="Vence del 16 a fin de mes" quincena={quincenas.second} highlight={!firstActive} />
       </section>
 
       <section className="mt-6">

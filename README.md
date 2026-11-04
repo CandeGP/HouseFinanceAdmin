@@ -13,11 +13,19 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 
 ## Capturas
 
-### App Android (modo oscuro; sigue el tema del teléfono)
+### App Android (tres temas: Aurora, Claro y Minimal; el de las capturas es Aurora)
 
 | Resumen | Gastos | Tarjetas | Cuenta y alertas |
 |---|---|---|---|
 | <img src="docs/screenshots/app-resumen.png" width="220"> | <img src="docs/screenshots/app-gastos.png" width="220"> | <img src="docs/screenshots/app-tarjetas.png" width="220"> | <img src="docs/screenshots/app-cuenta.png" width="220"> |
+
+| Acciones rápidas (+) | Dividir cobro | Préstamos | Amigos |
+|---|---|---|---|
+| <img src="docs/screenshots/app-arco.png" width="220"> | <img src="docs/screenshots/app-dividir.png" width="220"> | <img src="docs/screenshots/app-prestamos.png" width="220"> | <img src="docs/screenshots/app-amigos.png" width="220"> |
+
+| Compras a meses | Tema Claro |
+|---|---|
+| <img src="docs/screenshots/app-meses.png" width="220"> | <img src="docs/screenshots/app-resumen-claro.png" width="220"> |
 
 ### Dashboard web
 
@@ -58,11 +66,20 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 - **Conciliar con el banco**: capturas el "saldo utilizado" que muestra tu banco y la app te dice si cuadra o
   cuánto falta. Los estados de cuenta también cancelan una compra con su devolución y reconstruyen las compras
   a meses de bancos que solo listan cada mensualidad (Banamex).
-- **Préstamos entre personas**, aparte de los gastos: abonos, saldo por persona y perdón de la deuda.
+- **Préstamos entre personas**, aparte de los gastos: abonos, saldo por persona y perdón de la deuda. El
+  Resumen muestra "Por cobrar" (lo que te deben y lo que debes).
+- **Amigos**: lista de personas con su saldo, búsqueda y filtros (te deben / debes / saldados), con el detalle
+  de cada préstamo y un atajo para prestar a esa persona.
+- **Dividir cobro**: reparte un gasto entre varias personas y crea los préstamos de cada parte de una vez.
+- **Congelar tarjeta**: marca una tarjeta como congelada; no aparece al capturar gastos nuevos.
+- **Primer uso guiado**: bienvenida, creación o unión al hogar con código y tutoriales dentro de la app.
+- **Quincena actual**: la quincena en curso se marca en amarillo en el Resumen (app y web).
 - **Presupuestos por categoría** individuales (cada quien el suyo; el gasto del hogar es visible para los dos),
   **gastos recurrentes** detectados y **reportes** de mes contra mes por categoría y por tarjeta.
 - **Bloqueo con huella o PIN** del teléfono (opcional).
-- **Dashboard web** de solo lectura con edición de monto y categoría, mismo login que la app.
+- **Dashboard web** con edición de monto y categoría, mismo login que la app. Se instala como PWA en el
+  teléfono (manifest e ícono incluidos) y es responsivo.
+- **Login con límite de intentos** (web y Android): ver "Seguridad" más abajo.
 - **Actualizaciones dentro de la app**: al abrirla avisa si hay versión nueva (`latest.json` en el bucket
   público), la descarga, verifica su SHA-256 y abre el instalador de Android. También en Cuenta →
   "Buscar actualizaciones".
@@ -70,13 +87,21 @@ corte y cuánto hay que pagar. App Android + dashboard web + backend en Supabase
 ## Arquitectura
 
 ```
-android/   Kotlin + Jetpack Compose + supabase-kt (tema Fold claro/oscuro, fuente Inter)
+android/   Kotlin + Jetpack Compose + supabase-kt (3 temas, fuente Plus Jakarta Sans)
 web/       Next.js (App Router) + Tailwind v4 + supabase-js
-supabase/  Postgres + RLS + funciones SQL + pruebas pgTAP (migraciones versionadas)
+supabase/  Postgres + RLS + funciones SQL + Edge Function `login` + pruebas pgTAP (migraciones versionadas)
 docs/      Capturas del README
 ```
 
 - **Seguridad**: RLS por hogar en todas las tablas; el bucket de evidencias es privado.
+- **Límite de intentos de login** con *token bucket* (cubeta de fichas que se rellena de forma continua, no
+  en ventanas): **12 intentos por usuario por minuto** (1 ficha cada 5 s) y **30 por IP cada 20 s**
+  (1.5 fichas/s). Al vaciarse no esperas a que acabe el minuto: las fichas regresan una a una. El estado vive
+  en Postgres (`rate_limit_buckets`, función `take_token`, solo `service_role`) y la Edge Function
+  `supabase/functions/login` es la única puerta de entrada de la web y de Android. Si el límite no se puede
+  consultar, rechaza (falla cerrado). Responde 429 con `Retry-After`.
+  *Límite conocido*: quien llame directo a `/auth/v1/token` de Supabase se salta esta función; conviene
+  activar además las protecciones de Auth del panel de Supabase (CAPTCHA y límites propios).
 - **Privacidad**: los PDFs se leen y se reconocen **en el dispositivo**; solo se sube el archivo como
   evidencia si confirmas la importación. Las notificaciones no reconocidas se guardan solo en el teléfono.
 - **Lógica en el servidor** (una sola fuente de verdad para app y web): ciclos de tarjeta, deduplicación de
@@ -136,7 +161,11 @@ página `/descargar` toma la versión sola. La llave de firma NO está en el rep
 npx supabase login            # en una terminal real (abre el navegador)
 npx supabase link --project-ref <ref>
 npx supabase db push          # aplica las migraciones
+npx supabase functions deploy login --no-verify-jwt   # el login con límite de intentos
 ```
+
+La función `login` debe estar desplegada **antes** de publicar clientes que la usan. Para probarla en local:
+`npx supabase functions serve login --no-verify-jwt`.
 
 Apunta la app y la web a la URL del proyecto y su llave **publishable**. Desactiva "Confirm email" en
 Authentication si no quieres confirmar correos.
@@ -144,12 +173,14 @@ Authentication si no quieres confirmar correos.
 ## Pruebas
 
 - **Android**: más de 440 pruebas unitarias (parsers de cobros y estados, OCR, alertas, ciclos, conciliación,
-  quincenas, préstamos, reportes).
-- **Base de datos**: pgTAP por archivo en `supabase/tests/database/`.
+  quincenas, préstamos, amigos, dividir cobro, respuestas del login, reportes).
+- **Web**: `cd web && npm test` (20 pruebas: ciclos, quincenas, respuestas del login).
+- **Base de datos**: pgTAP por archivo en `supabase/tests/database/` (incluye el rate limit del login:
+  12 intentos pasan, el 13 se rechaza, recarga parcial y claves por IP independientes).
   Los archivos usan correos de prueba fijos: si tu base local ya tiene ese usuario, corre uno por uno.
 
 ## Estado
 
 Hecho: todo lo anterior, incluido el APK de release firmado y publicado, y la web desplegada.
-Pendiente: respaldos automáticos de la base, exportar a CSV, captura por Gmail y sugerir abonos de préstamos
-desde transferencias recibidas.
+Pendiente: respaldos automáticos de la base, exportar a CSV, probar en iPhone (la web ya se instala como
+PWA) y sugerir abonos de préstamos desde transferencias recibidas.

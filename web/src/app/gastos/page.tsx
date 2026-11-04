@@ -112,7 +112,7 @@ export default function Gastos() {
       <Card className="divide-y divide-line p-0">
         {rows.map((t) => (
           <div key={t.id} onClick={() => (t.owner_id === uid ? setEditing(t) : undefined)}
-            className={`grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 px-6 py-4 md:grid-cols-[90px_1fr_220px_160px_auto] ${t.owner_id === uid ? "cursor-pointer hover:bg-canvas" : ""}`}>
+            className={`grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 px-6 py-4 md:grid-cols-[90px_1fr_220px_160px_auto] ${t.owner_id === uid ? "cursor-pointer hover:bg-mist" : ""}`}>
             <p className="text-sm text-muted md:self-center">{dayLabel(t.occurred_at)}</p>
             <div className="min-w-0 md:self-center">
               <p className="truncate font-semibold">{t.merchant}</p>
