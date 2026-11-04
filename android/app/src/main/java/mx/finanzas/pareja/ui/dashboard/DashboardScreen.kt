@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.dashboard
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -160,7 +161,7 @@ fun DashboardScreen(
                     onAction = onAddCard,
                 )
             else -> LazyColumn(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 16.dp + LocalDockInset.current),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {

@@ -41,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +70,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,6 +88,15 @@ private val FabSize = 68.dp
 private val FabLift = 22.dp
 private val DockSideMargin = 18.dp
 private val DockBottomMargin = 12.dp
+
+/** Cuánto ocupa la barra flotante desde el borde inferior: las pantallas con scroll lo dejan libre al final de su lista. */
+val DockOccupiedHeight = DockHeight + FabLift + DockBottomMargin
+
+/** Margen inferior que debe respetar el contenido para que lo último no quede detrás de la barra (0 si no hay barra). */
+val LocalDockInset = compositionLocalOf { 0.dp }
+
+/** Qué tan opaca es la barra: lo justo para que se lea, dejando ver el contenido que pasa por detrás. */
+private const val DOCK_ALPHA = 0.8f
 private val ArcRadius = 150.dp
 private val ActionSize = 58.dp
 private val HoverRadius = 46.dp
@@ -127,9 +138,9 @@ fun AppDock(
         Surface(
             modifier = Modifier.fillMaxWidth().height(DockHeight),
             shape = RoundedCornerShape(30.dp),
-            color = tokens.dock,
+            color = tokens.dock.copy(alpha = DOCK_ALPHA),
             border = BorderStroke(1.dp, tokens.dockBorder),
-            shadowElevation = 8.dp,
+            shadowElevation = 0.dp, // con una barra translúcida la sombra se vería a través de ella
         ) {
             Row(
                 Modifier.fillMaxSize(),
@@ -277,7 +288,9 @@ fun AddMenuOverlay(
                     fontSize = 12.sp,
                     fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.offset(x - 50.dp, y - ActionSize / 2 - 24.dp).width(100.dp),
+                    maxLines = 1, // un nombre largo no debe partirse en dos líneas y pisar a sus vecinos
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.offset(x - 58.dp, y - ActionSize / 2 - 24.dp).width(116.dp),
                 )
             }
 

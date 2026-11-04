@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.cards
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -216,7 +217,7 @@ fun CardsScreen(
             // Siempre se muestra la lista: así "Archivadas" es visible aunque no quede ninguna activa.
             run {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp + LocalDockInset.current),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     // El estado de cuenta se concilia contra una tarjeta tuya: sin ninguna, el acceso no tiene sentido.

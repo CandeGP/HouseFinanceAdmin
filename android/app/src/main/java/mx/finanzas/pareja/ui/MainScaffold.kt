@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,7 +31,10 @@ import mx.finanzas.pareja.alerts.AlertRunner
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import mx.finanzas.pareja.ui.components.DockOccupiedHeight
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -150,37 +154,17 @@ fun MainScaffold(
     // Un toque en el «+» registra un cobro; estas salen al mantenerlo presionado.
     val addActions = listOf(
         AddAction("Pago de tarjeta", Icons.Filled.CreditCard, listOf(Color(0xFF3DD6D0), Color(0xFF4F8CFF))) { goTab(ROUTE_CARDS) },
-        AddAction("Efectivo o transferencia", Icons.Filled.Payments, listOf(Color(0xFFFFB547), Color(0xFFFF6FA8))) { nav.navigate("payment_form") },
+        AddAction("Efectivo o transf.", Icons.Filled.Payments, listOf(Color(0xFFFFB547), Color(0xFFFF6FA8))) { nav.navigate("payment_form") },
         AddAction("Escanear ticket", Icons.Filled.CameraAlt, listOf(Color(0xFF4ADE80), Color(0xFF3DD6D0))) { nav.navigate("tx_form?scan=true") },
         AddAction("Prestar a alguien", Icons.Filled.Handshake, listOf(Color(0xFF8B7CFF), Color(0xFF5B8CFF))) { nav.navigate("loans?new=true") },
         AddAction("Dividir cobro", Icons.AutoMirrored.Filled.CallSplit, listOf(Color(0xFFFF6FA8), Color(0xFF8B7CFF))) { nav.navigate("split") },
     )
 
     Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            bottomBar = {
-                if (route in TAB_ROUTES) {
-                    AppDock(
-                        left = LEFT_TABS,
-                        right = RIGHT_TABS,
-                        currentRoute = route,
-                        onTab = ::goTab,
-                        onAdd = { nav.navigate("tx_form") },
-                        onAddLongPress = { addMenuOpen = true },
-                        onAddDrag = { dragPoint = it },
-                        onAddRelease = {
-                            val choice = hoveredAction
-                            dragPoint = null
-                            if (choice != null) {
-                                addMenuOpen = false
-                                addActions[choice].onSelect()
-                            }
-                        },
-                        addActions = addActions,
-                    )
-                }
-            },
-        ) { padding ->
+        // La barra flota encima del contenido (no lo empuja): lo que hay detrás se alcanza a ver a través de ella.
+        // Las pantallas con scroll dejan [DockOccupiedHeight] libre al final para poder subir lo último sobre ella.
+        Scaffold { padding ->
+          CompositionLocalProvider(LocalDockInset provides if (route in TAB_ROUTES) DockOccupiedHeight else 0.dp) {
             NavHost(
                 navController = nav,
                 startDestination = ROUTE_DASHBOARD,
@@ -230,7 +214,7 @@ fun MainScaffold(
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp),
                         )
                         PillTabs(
-                            labels = listOf("Gastos", "Efectivo", "A meses"),
+                            labels = listOf("Movimientos", "Efectivo", "A meses"),
                             selected = tab,
                             onSelect = { tab = it },
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
@@ -419,6 +403,29 @@ fun MainScaffold(
                         },
                     )
                 }
+            }
+          }
+        }
+        if (route in TAB_ROUTES) {
+            Box(Modifier.align(Alignment.BottomCenter)) {
+                AppDock(
+                    left = LEFT_TABS,
+                    right = RIGHT_TABS,
+                    currentRoute = route,
+                    onTab = ::goTab,
+                    onAdd = { nav.navigate("tx_form") },
+                    onAddLongPress = { addMenuOpen = true },
+                    onAddDrag = { dragPoint = it },
+                    onAddRelease = {
+                        val choice = hoveredAction
+                        dragPoint = null
+                        if (choice != null) {
+                            addMenuOpen = false
+                            addActions[choice].onSelect()
+                        }
+                    },
+                    addActions = addActions,
+                )
             }
         }
         AddMenuOverlay(

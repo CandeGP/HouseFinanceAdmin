@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.payments
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -131,7 +132,7 @@ fun PaymentsScreen(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp + LocalDockInset.current),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.items, key = { it.id }) { payment ->

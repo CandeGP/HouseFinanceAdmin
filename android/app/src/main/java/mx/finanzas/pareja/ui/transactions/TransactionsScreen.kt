@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.transactions
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -94,7 +95,7 @@ import mx.finanzas.pareja.ui.components.ScopeToggle
 import mx.finanzas.pareja.ui.components.UsageBar
 import mx.finanzas.pareja.ui.dashboard.Scope
 
-private val VIEWS = listOf("Movimientos", "Por categoría")
+private val VIEWS = listOf("Lista", "Por categoría")
 
 @Composable
 fun TransactionsScreen(
@@ -152,7 +153,7 @@ fun TransactionsScreen(
                         subtitle = "Registra un gasto con el botón +.",
                     )
                 tab == 0 -> LazyColumn(
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp + LocalDockInset.current),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     // Agrupar por día solo tiene sentido ordenado por fecha; con otro orden va una lista corrida.
@@ -385,7 +386,7 @@ private fun TransactionRow(
 @Composable
 private fun SliceList(slices: List<SpendingSlice>) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp + LocalDockInset.current),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(slices, key = { it.label }) { slice ->

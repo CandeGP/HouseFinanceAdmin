@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.account
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -406,7 +407,7 @@ fun AccountScreen(
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp + LocalDockInset.current),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Cuenta", style = MaterialTheme.typography.headlineMedium)

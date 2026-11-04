@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.installments
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -95,11 +96,10 @@ fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: (() -> Unit)?) {
                     icon = Icons.Outlined.CalendarMonth,
                 )
                 else -> LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + LocalDockInset.current),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item { SummaryCard(state.months) }
-                    item { MonthBars(state.months.take(BAR_MONTHS)) }
                     item { SectionLabel("COMPRAS ACTIVAS", Modifier.padding(top = 8.dp)) }
                     items(activePurchases(state.months), key = { "active-${it.transactionId}" }) { purchase ->
                         ActivePurchaseCard(purchase, state.cards[purchase.cardId])
@@ -135,9 +135,7 @@ private fun MonthBars(months: List<MsiMonth>) {
     val maxTotal = months.maxOf { it.total }.coerceAtLeast(1.0)
     val tokens = AppTheme.tokens
     val spoken = months.joinToString(", ") { "${it.label}: ${formatMxn(it.total)}" }
-    GlassCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Mensualidades de los próximos meses", style = MaterialTheme.typography.labelLarge)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 Modifier.fillMaxWidth()
                     // Las barras son dibujo: el lector de pantalla lee los montos de cada mes completos.
@@ -165,7 +163,6 @@ private fun MonthBars(months: List<MsiMonth>) {
                     }
                 }
             }
-        }
     }
 }
 
@@ -192,17 +189,32 @@ private fun ActivePurchaseCard(item: MsiInstallment, card: CardModel?) {
 @Composable
 private fun SummaryCard(months: List<MsiMonth>) {
     val pending = pendingInstallments(months)
-    GlassCard(
-        container = AppTheme.tokens.quincenaSecond,
-        contentColor = AppTheme.tokens.onQuincenaSecond,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Te falta pagar de compras a meses", style = MaterialTheme.typography.labelLarge)
-            Text(formatMxn(pending.amount), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(
-                "${pending.installments} mensualidades" + (pending.lastMonth?.let { " hasta ${it.label}" } ?: ""),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+    // Una sola tarjeta (como en el mockup): lo que falta pagar arriba y, debajo, las barras de los próximos meses.
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "Te falta pagar de compras a meses",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(formatMxn(pending.amount), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("${pending.installments} mensualidades", style = MaterialTheme.typography.bodyMedium)
+                }
+                pending.lastMonth?.let {
+                    Text(
+                        "Hasta ${it.label}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppTheme.tokens.chart[0],
+                        modifier = Modifier.padding(start = 8.dp)
+                            .background(AppTheme.tokens.chart[0].copy(alpha = 0.18f), RoundedCornerShape(99.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+            MonthBars(months.take(BAR_MONTHS))
         }
     }
 }

@@ -1,5 +1,6 @@
 package mx.finanzas.pareja.ui.cards
 
+import mx.finanzas.pareja.ui.components.LocalDockInset
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
@@ -296,7 +297,7 @@ internal fun CardDetailScreen(
         if (mine && status != null) {
             GradientButton(
                 onClick = onPay,
-                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp, top = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp + LocalDockInset.current, top = 4.dp),
             ) { Text("Pagar tarjeta") }
         }
     }

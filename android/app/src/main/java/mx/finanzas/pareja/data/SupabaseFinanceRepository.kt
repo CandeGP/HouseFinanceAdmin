@@ -192,6 +192,7 @@ class SupabaseFinanceRepository(private val client: SupabaseClient, private val 
             },
         ).decodeList<CycleEstimate>().firstOrNull()
 
+    // Los abonos a capital bajan lo que falta de cada mes; sin ellos (o si su consulta falla) sale el calendario original.
     override suspend fun msiSchedule(ref: LocalDate, months: Int): List<MsiInstallment> =
         client.postgrest.rpc(
             "msi_schedule",
@@ -199,7 +200,7 @@ class SupabaseFinanceRepository(private val client: SupabaseClient, private val 
                 put("p_ref", ref.toString())
                 put("p_months", months)
             },
-        ).decodeList<MsiInstallment>()
+        ).decodeList<MsiInstallment>().withCapitalCredits(cardCreditsOrEmpty())
 
     override suspend fun balanceChecks(): List<CardBalanceCheck> =
         client.postgrest.from("card_balance_checks").select {

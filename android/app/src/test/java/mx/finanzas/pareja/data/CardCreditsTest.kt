@@ -59,6 +59,44 @@ class CardCreditsTest {
         assertEquals(0.0, result.single().estimate!!.msiRemaining, 0.001)
     }
 
+    private fun installment(due: LocalDate, amount: Double, card: String = "c1") = MsiInstallment(
+        cardId = card, transactionId = "t-$due-$card", merchant = "Laptop", cycleEnd = due, dueDate = due,
+        number = 1, installments = 3, amount = amount,
+    )
+
+    private val schedule = listOf(
+        installment(LocalDate(2026, 12, 9), 1000.0),
+        installment(LocalDate(2027, 1, 9), 1000.0),
+        installment(LocalDate(2027, 2, 9), 1000.0),
+    )
+
+    @Test
+    fun `un abono a capital baja en la misma proporcion todos los meses que faltan`() {
+        val result = schedule.withCapitalCredits(listOf(credit(1500.0, PaymentDestination.CAPITAL, null)))
+        assertEquals(listOf(500.0, 500.0, 500.0), result.map { it.amount })
+    }
+
+    @Test
+    fun `un abono no cambia las mensualidades que vencian antes de hacerlo ni las de otra tarjeta`() {
+        val withEarlier = listOf(installment(LocalDate(2026, 10, 9), 700.0)) + schedule + installment(LocalDate(2027, 1, 9), 400.0, "otra")
+        val result = withEarlier.withCapitalCredits(listOf(credit(1500.0, PaymentDestination.CAPITAL, null)))
+
+        assertEquals(700.0, result.first().amount, 0.001)
+        assertEquals(400.0, result.last().amount, 0.001)
+    }
+
+    @Test
+    fun `si el abono cubre todo lo que falta, las mensualidades desaparecen`() {
+        val result = schedule.withCapitalCredits(listOf(credit(9000.0, PaymentDestination.CAPITAL, null)))
+        assertEquals(emptyList<MsiInstallment>(), result)
+    }
+
+    @Test
+    fun `los adelantos y pagos al corte no tocan el calendario`() {
+        val result = schedule.withCapitalCredits(listOf(credit(1500.0, PaymentDestination.NEXT_CYCLE, cycleEnd)))
+        assertEquals(schedule, result)
+    }
+
     @Test
     fun `pagar de mas parte el pago entre el corte y el excedente`() {
         assertEquals(
