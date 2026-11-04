@@ -22,6 +22,9 @@ data class InboxUiState(
     val message: String? = null,
 )
 
+/** Un cobro por aprobar con la tarjeta y categoría que se le aplicarán. */
+data class ConfirmEntry(val id: String, val cardId: String?, val categoryId: String?)
+
 /** Cobros capturados automáticamente que esperan que la persona los confirme o descarte. */
 class InboxViewModel(
     private val repo: FinanceRepository,
@@ -57,6 +60,20 @@ class InboxViewModel(
             return
         }
         run { repo.confirmTransaction(id, cardId, categoryId) }
+    }
+
+    /** Aprueba de una vez los que ya tienen tarjeta; los que no, quedan en la lista y se avisa cuántos. */
+    fun confirmAll(entries: List<ConfirmEntry>) {
+        val ready = entries.filter { it.cardId != null }
+        val skipped = entries.size - ready.size
+        if (ready.isEmpty()) {
+            _state.update { it.copy(message = "Elige la tarjeta de cada cobro para poder aprobarlos") }
+            return
+        }
+        run {
+            ready.forEach { repo.confirmTransaction(it.id, it.cardId!!, it.categoryId) }
+            if (skipped > 0) _state.update { it.copy(message = "$skipped sin tarjeta: elígela con Editar para aprobarlos") }
+        }
     }
 
     fun discard(id: String) {

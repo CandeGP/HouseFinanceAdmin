@@ -97,6 +97,8 @@ fun LoansScreen(
 
     LaunchedEffect(state.saved) {
         if (state.saved) {
+            // Si el formulario se abrió directo (menú + o detalle de una persona), al guardar se vuelve a donde se estaba.
+            if (showNew && openNewOnStart) onBack()
             showNew = false
             repayFor = null
             editRepayment = null
@@ -171,7 +173,12 @@ fun LoansScreen(
             people = state.people,
             errors = state.loanErrors,
             today = today,
-            onDismiss = { showNew = false; vm.consumeSaved() },
+            onDismiss = {
+                showNew = false
+                vm.consumeSaved()
+                // Cerrar sin guardar también regresa al origen, no a la lista de Préstamos.
+                if (openNewOnStart) onBack()
+            },
             onEdit = vm::consumeSaved,
             onSave = vm::addLoan,
         )

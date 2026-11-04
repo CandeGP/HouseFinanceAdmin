@@ -6,6 +6,7 @@ import mx.finanzas.pareja.card
 import mx.finanzas.pareja.data.Category
 import mx.finanzas.pareja.data.TxStatus
 import mx.finanzas.pareja.tx
+import mx.finanzas.pareja.ui.inbox.ConfirmEntry
 import mx.finanzas.pareja.ui.inbox.InboxViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -50,6 +51,24 @@ class InboxViewModelTest {
     fun `confirmar sin tarjeta no escribe y avisa`() {
         val vm = vm()
         vm.confirm("p1", cardId = null, categoryId = null)
+        assertTrue(repo.confirmedTransactions.isEmpty())
+        assertNotNull(vm.state.value.message)
+    }
+
+    @Test
+    fun `aprobar todos confirma los que tienen tarjeta y avisa de los demas`() {
+        val vm = vm()
+        vm.confirmAll(listOf(ConfirmEntry("p1", "mine", "cat-food"), ConfirmEntry("p2", null, null)))
+
+        assertEquals(listOf(Triple("p1", "mine", "cat-food")), repo.confirmedTransactions)
+        assertTrue(vm.state.value.message!!.contains("1 sin tarjeta"))
+    }
+
+    @Test
+    fun `aprobar todos sin ninguna tarjeta no escribe y avisa`() {
+        val vm = vm()
+        vm.confirmAll(listOf(ConfirmEntry("p1", null, null), ConfirmEntry("p2", null, null)))
+
         assertTrue(repo.confirmedTransactions.isEmpty())
         assertNotNull(vm.state.value.message)
     }

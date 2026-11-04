@@ -98,10 +98,10 @@ private val TUTORIALS = listOf(
         title = "Registrar un pago en efectivo o transferencia",
         summary = "Con su fecha, hora y comprobante.",
         steps = listOf(
-            "Mantén presionado el botón + y elige Registrar pago.",
+            "Mantén presionado el botón + y elige Efectivo o transferencia.",
             "Escribe el monto, la fecha y la hora.",
             "Adjunta el comprobante si lo tienes.",
-            "Guarda. Lo ves en Gastos, pestaña Pagos.",
+            "Guarda. Lo ves en Gastos, pestaña Efectivo.",
         ),
     ),
     Tutorial(

@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Dashboard
@@ -150,9 +150,9 @@ fun MainScaffold(
     // Un toque en el «+» registra un cobro; estas salen al mantenerlo presionado.
     val addActions = listOf(
         AddAction("Pago de tarjeta", Icons.Filled.CreditCard, listOf(Color(0xFF3DD6D0), Color(0xFF4F8CFF))) { goTab(ROUTE_CARDS) },
-        AddAction("Registrar pago", Icons.Filled.Payments, listOf(Color(0xFFFFB547), Color(0xFFFF6FA8))) { nav.navigate("payment_form") },
+        AddAction("Efectivo o transferencia", Icons.Filled.Payments, listOf(Color(0xFFFFB547), Color(0xFFFF6FA8))) { nav.navigate("payment_form") },
         AddAction("Escanear ticket", Icons.Filled.CameraAlt, listOf(Color(0xFF4ADE80), Color(0xFF3DD6D0))) { nav.navigate("tx_form?scan=true") },
-        AddAction("Préstamo", Icons.Filled.AccountBalance, listOf(Color(0xFF8B7CFF), Color(0xFF5B8CFF))) { nav.navigate("loans?new=true") },
+        AddAction("Prestar a alguien", Icons.Filled.Handshake, listOf(Color(0xFF8B7CFF), Color(0xFF5B8CFF))) { nav.navigate("loans?new=true") },
         AddAction("Dividir cobro", Icons.AutoMirrored.Filled.CallSplit, listOf(Color(0xFFFF6FA8), Color(0xFF8B7CFF))) { nav.navigate("split") },
     )
 
@@ -230,7 +230,7 @@ fun MainScaffold(
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp),
                         )
                         PillTabs(
-                            labels = listOf("Gastos", "Pagos", "A meses"),
+                            labels = listOf("Gastos", "Efectivo", "A meses"),
                             selected = tab,
                             onSelect = { tab = it },
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),

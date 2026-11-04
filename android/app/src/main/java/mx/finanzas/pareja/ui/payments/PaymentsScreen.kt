@@ -53,7 +53,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.sp
 import mx.finanzas.pareja.ui.AppTheme
 import mx.finanzas.pareja.ui.components.GlassCard
 import mx.finanzas.pareja.ui.components.MonthSummaryCard
-import mx.finanzas.pareja.ui.components.SelectChip
 import mx.finanzas.pareja.ui.dashboard.Scope
 import mx.finanzas.pareja.ui.components.ScopeToggle
 
@@ -89,12 +88,8 @@ fun PaymentsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            Row(
-                Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SelectChip("Míos", state.scope == Scope.MINE, { vm.setScope(Scope.MINE) })
-                SelectChip("Ambos", state.scope == Scope.BOTH, { vm.setScope(Scope.BOTH) })
+            Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp)) {
+                ScopeToggle(scope = state.scope, onChange = vm::setScope)
             }
             MonthSummaryCard(
                 monthLabel = formatMonthEs(state.year, state.month),
@@ -113,7 +108,7 @@ fun PaymentsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Outlined.AccountBalance, contentDescription = null, tint = AppTheme.tokens.chart[0])
+                    Icon(Icons.Outlined.Handshake, contentDescription = null, tint = AppTheme.tokens.chart[0])
                     Text("Préstamos entre personas", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
                 }

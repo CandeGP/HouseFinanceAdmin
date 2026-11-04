@@ -122,7 +122,7 @@ fun PaymentFormScreen(
                 Box(Modifier.fillMaxWidth().height(48.dp)) {
                     TextButton(onClick = { onDone(false) }, modifier = Modifier.align(Alignment.CenterStart)) { Text("Cancelar") }
                     Text(
-                        if (vm.isEditing) "Editar pago" else "Registrar pago",
+                        if (vm.isEditing) "Editar pago" else "Efectivo o transferencia",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.align(Alignment.Center),
                     )
