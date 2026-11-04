@@ -34,8 +34,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.Card as CardModel
 import mx.finanzas.pareja.data.MsiInstallment
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.sp
 import mx.finanzas.pareja.domain.MsiMonth
+import mx.finanzas.pareja.domain.activePurchases
 import mx.finanzas.pareja.domain.cardLabel
+import mx.finanzas.pareja.domain.compactMxn
+import mx.finanzas.pareja.ui.components.SectionLabel
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.domain.pendingInstallments
 import mx.finanzas.pareja.ui.AppTheme
@@ -87,6 +99,12 @@ fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: (() -> Unit)?) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item { SummaryCard(state.months) }
+                    item { MonthBars(state.months.take(BAR_MONTHS)) }
+                    item { SectionLabel("COMPRAS ACTIVAS", Modifier.padding(top = 8.dp)) }
+                    items(activePurchases(state.months), key = { "active-${it.transactionId}" }) { purchase ->
+                        ActivePurchaseCard(purchase, state.cards[purchase.cardId])
+                    }
+                    item { SectionLabel("POR MES", Modifier.padding(top = 8.dp)) }
                     items(state.months, key = { it.label }) { month ->
                         val expanded = month.label in open || (open.isEmpty() && month.label == firstLabel)
                         MonthCard(
@@ -102,6 +120,71 @@ fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: (() -> Unit)?) {
                     }
                 }
             }
+        }
+    }
+}
+
+private const val BAR_MONTHS = 5
+private val BAR_MAX_HEIGHT = 96.dp
+private val BAR_MIN_HEIGHT = 14.dp
+
+/** Barras de lo que se paga de compras a meses en los próximos meses; la del mes más cercano va resaltada. */
+@Composable
+private fun MonthBars(months: List<MsiMonth>) {
+    if (months.size < 2) return // con un solo mes una barra no dice nada
+    val maxTotal = months.maxOf { it.total }.coerceAtLeast(1.0)
+    val tokens = AppTheme.tokens
+    val spoken = months.joinToString(", ") { "${it.label}: ${formatMxn(it.total)}" }
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Mensualidades de los próximos meses", style = MaterialTheme.typography.labelLarge)
+            Row(
+                Modifier.fillMaxWidth()
+                    // Las barras son dibujo: el lector de pantalla lee los montos de cada mes completos.
+                    .clearAndSetSemantics { contentDescription = "Mensualidades por mes. $spoken" },
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                months.forEachIndexed { index, month ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(compactMxn(month.total), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            Modifier.fillMaxWidth()
+                                .height((BAR_MAX_HEIGHT * (month.total / maxTotal).toFloat()).coerceAtLeast(BAR_MIN_HEIGHT))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (index == 0) tokens.accent
+                                    else SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)),
+                                ),
+                        )
+                        Text(
+                            month.label.take(3).replaceFirstChar { it.uppercase() },
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Una compra a meses que sigue en pie: su siguiente mensualidad y cuánto lleva pagado. */
+@Composable
+private fun ActivePurchaseCard(item: MsiInstallment, card: CardModel?) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(item.merchant, style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.weight(1f))
+                Text(formatMxn(item.amount), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                (card?.let { cardLabel(it) } ?: "Tarjeta") + " · mensualidad ${item.number} de ${item.installments}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            UsageBar(fraction = item.number.toFloat() / item.installments)
         }
     }
 }

@@ -32,6 +32,20 @@ class MsiProjectionTest {
     }
 
     @Test
+    fun `las compras activas traen su siguiente mensualidad, las mas pesadas primero`() {
+        val active = activePurchases(projectInstallments(rows))
+
+        assertEquals(listOf("AOC", "HUAWEI", "ML"), active.map { it.merchant })
+        assertEquals(listOf(5, 9, 10), active.map { it.number })
+    }
+
+    @Test
+    fun `el monto corto usa k desde mil`() {
+        assertEquals("3.4k", compactMxn(3444.81))
+        assertEquals("980", compactMxn(980.4))
+    }
+
+    @Test
     fun `cada mes suma sus mensualidades`() {
         val (nov, dic) = projectInstallments(rows)
 

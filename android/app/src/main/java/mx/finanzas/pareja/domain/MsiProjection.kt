@@ -20,6 +20,17 @@ fun projectInstallments(rows: List<MsiInstallment>): List<MsiMonth> =
         .toSortedMap(compareBy({ it.first }, { it.second }))
         .map { (ym, items) -> MsiMonth(ym.first, ym.second, items.sortedByDescending { it.amount }) }
 
+/** La siguiente mensualidad de cada compra a meses que sigue en pie, las más pesadas primero. */
+fun activePurchases(months: List<MsiMonth>): List<MsiInstallment> =
+    months.flatMap { it.items }
+        .groupBy { it.transactionId }
+        .map { (_, items) -> items.minBy { it.number } }
+        .sortedByDescending { it.amount }
+
+/** Monto corto para las barras: 3,444.81 → «3.4k», 980 → «980». */
+fun compactMxn(amount: Double): String =
+    if (amount >= 1000) "%.1fk".format(java.util.Locale.US, amount / 1000) else "%.0f".format(java.util.Locale.US, amount)
+
 /** Cuántas mensualidades y cuánto dinero falta pagar en total de las compras a meses. */
 data class MsiPending(val installments: Int, val amount: Double, val lastMonth: MsiMonth?)
 
