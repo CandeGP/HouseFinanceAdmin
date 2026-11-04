@@ -104,8 +104,11 @@ fun EmptyState(
     onAction: (() -> Unit)? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Outlined.Inbox,
 ) {
+    // Dentro de una lista (altura infinita) no se puede hacer scroll ni llenar la pantalla: solo con alto acotado.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+    val bounded = constraints.hasBoundedHeight
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(32.dp),
+        modifier = (if (bounded) Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier.fillMaxWidth()).padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -125,6 +128,7 @@ fun EmptyState(
         if (actionLabel != null && onAction != null) {
             TextButton(onClick = onAction, modifier = Modifier.padding(top = 8.dp)) { Text(actionLabel) }
         }
+    }
     }
 }
 
