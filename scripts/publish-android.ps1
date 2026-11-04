@@ -52,7 +52,7 @@ function Publish($local, $name, $type, $cache) {
     try {
         # Reemplaza si existe (el CLI responde 409 si el objeto ya está).
         npx supabase storage rm "ss:///releases/$name" --linked --experimental --yes 2>&1 | Out-Null
-        $r = (npx supabase storage cp $local "ss:///releases/$name" --linked --experimental `
+        $r = (npx supabase storage cp $local "ss:///releases/$name" --linked --experimental --yes `
                 --content-type $type --cache-control $cache 2>&1 | Out-String)
     } finally {
         $ErrorActionPreference = $previous

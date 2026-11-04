@@ -41,7 +41,7 @@ export default function Meses() {
             <details open={index === 0}>
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5">
                 <div>
-                  <p className="text-xl font-semibold capitalize tracking-[-0.03em]">{monthLabel(month.key)}</p>
+                  <p className="text-xl font-semibold first-letter:uppercase tracking-[-0.03em]">{monthLabel(month.key)}</p>
                   <p className="text-sm text-muted">
                     {month.items.length} mensualidades
                     {month.finishing > 0 ? ` · ${month.finishing} termina${month.finishing > 1 ? "n" : ""}` : ""}
