@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { loadFinance, type Finance } from "@/lib/data";
+import { signInThroughRateLimit } from "@/lib/login";
 import { configured, supabase } from "@/lib/supabase";
 import { Card, fieldClass, primaryButton } from "./ui";
 
@@ -71,8 +72,7 @@ function Login() {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) setError("Correo o contraseña incorrectos");
+    setError(await signInThroughRateLimit(email, password));
     setBusy(false);
   }
 
@@ -113,7 +113,7 @@ function Workspace({ uid, children }: { uid: string; children: ReactNode }) {
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-6">
-      <nav className="sticky top-4 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-canvas px-6 py-4 shadow-nav sm:px-8">
+      <nav className="sticky top-4 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-line bg-card px-6 py-4 shadow-nav backdrop-blur sm:px-8">
         <div className="flex gap-6">
           {LINKS.map((link) => (
             <Link key={link.href} href={link.href}
