@@ -16,7 +16,7 @@ class FinanzasApp : Application() {
     }
 
     val repository: FinanceRepository by lazy {
-        SupabaseFinanceRepository(createSupabase(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_KEY))
+        SupabaseFinanceRepository(createSupabase(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_KEY), BuildConfig.SUPABASE_URL)
     }
 
     val captureStore: PendingCaptureStore by lazy { PendingCaptureStore(this) }

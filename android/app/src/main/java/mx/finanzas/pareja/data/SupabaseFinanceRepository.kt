@@ -4,10 +4,13 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
-import java.net.HttpURLConnection
-import java.net.URL
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.contentType
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
@@ -38,7 +41,7 @@ fun createSupabase(url: String, key: String): SupabaseClient =
     }
 
 private const val PAYEES_LOOKBACK = 500L // últimos pagos que se revisan para sugerir "Pagado a"
-private const val LOGIN_TIMEOUT_MS = 15_000
+private val loginHttp by lazy { HttpClient(OkHttp) }
 private const val LOANS_LIMIT = 500L // préstamos y abonos que se cargan a la vez
 
 @Serializable
@@ -47,7 +50,8 @@ private data class NewCategory(@SerialName("household_id") val householdId: Stri
 @Serializable
 private data class PayeeRow(val counterparty: String? = null)
 
-class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRepository {
+/** [supabaseUrl] va completo (con http/https): el cliente solo guarda el host y no sirve para armar la URL del login. */
+class SupabaseFinanceRepository(private val client: SupabaseClient, private val supabaseUrl: String) : FinanceRepository {
 
     // ---- Sesión
     override suspend fun currentUserId(): String? {
@@ -57,29 +61,20 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
 
     // Entra por la función `login` del servidor, que aplica el rate limit (cubetas por IP y por usuario).
     override suspend fun signIn(email: String, password: String) {
-        val tokens = withContext(Dispatchers.IO) { requestLogin(email, password) }
+        val tokens = requestLogin(email, password)
         client.auth.importAuthToken(tokens.accessToken, tokens.refreshToken)
     }
 
-    private fun requestLogin(email: String, password: String): LoginTokens {
-        val connection = URL("${client.supabaseUrl}/functions/v1/login").openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = LOGIN_TIMEOUT_MS
-            connection.readTimeout = LOGIN_TIMEOUT_MS
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("apikey", client.supabaseKey)
-            connection.setRequestProperty("Authorization", "Bearer ${client.supabaseKey}")
-            val payload = buildJsonObject { put("email", email); put("password", password) }.toString()
-            connection.outputStream.use { it.write(payload.toByteArray()) }
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            return parseLoginResponse(status, body, connection.getHeaderField("Retry-After"))
-        } finally {
-            connection.disconnect()
+    private suspend fun requestLogin(email: String, password: String): LoginTokens {
+        val payload = buildJsonObject { put("email", email); put("password", password) }.toString()
+        // Ktor no lanza en respuestas 4xx/5xx (HttpURLConnection sí lanza IOException en un 401 sin WWW-Authenticate).
+        val response = loginHttp.post("${supabaseUrl.trimEnd('/')}/functions/v1/login") {
+            header("apikey", client.supabaseKey)
+            header("Authorization", "Bearer ${client.supabaseKey}")
+            contentType(ContentType.Application.Json)
+            setBody(payload)
         }
+        return parseLoginResponse(response.status.value, response.bodyAsText(), response.headers["Retry-After"])
     }
 
     override suspend fun signUp(email: String, password: String) {
