@@ -113,20 +113,20 @@ export default function Gastos() {
         {rows.map((t) => (
           <div key={t.id} onClick={() => (t.owner_id === uid ? setEditing(t) : undefined)}
             className={`grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 px-6 py-4 md:grid-cols-[90px_1fr_220px_160px_auto] ${t.owner_id === uid ? "cursor-pointer hover:bg-mist" : ""}`}>
-            <p className="text-sm text-muted md:self-center">{dayLabel(t.occurred_at)}</p>
-            <div className="min-w-0 md:self-center">
+            <p className="order-3 col-span-2 text-sm text-muted md:order-none md:col-span-1 md:self-center">{dayLabel(t.occurred_at)}</p>
+            <div className="order-1 min-w-0 md:order-none md:self-center">
               <p className="truncate font-semibold">{t.merchant}</p>
               <p className="text-sm text-muted">{ownerLabel(t.owner_id)}</p>
             </div>
             <div className="hidden md:block md:justify-self-start md:self-center">
               {cardOf(t.card_id) ? <CardChip card={cardOf(t.card_id)!} /> : <span className="text-sm text-muted">Sin tarjeta</span>}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="order-4 col-span-2 flex flex-wrap items-center gap-2 md:order-none md:col-span-1">
               <Tag>{categoryLabel(t.category_id)}</Tag>
               {t.payment_mode === "msi" ? <Tag>MSI {t.installment_number ?? 0}/{t.installments}</Tag> : null}
               {t.status === "pending_review" ? <Tag>Por revisar</Tag> : null}
             </div>
-            <p className="text-right font-semibold tracking-[-0.03em] md:self-center">−{mxn(t.amount)}</p>
+            <p className="order-2 whitespace-nowrap text-right font-semibold tracking-[-0.03em] md:order-none md:self-center">−{mxn(t.amount)}</p>
           </div>
         ))}
         {rows.length === 0 ? <p className="p-6 text-muted">Nada coincide con los filtros.</p> : null}

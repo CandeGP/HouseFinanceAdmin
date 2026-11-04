@@ -139,7 +139,7 @@ export default function Resumen() {
               </div>
               <div className="flex items-center gap-3">
                 {t.status === "pending_review" ? <Tag>Por revisar</Tag> : null}
-                <span className="font-semibold tracking-[-0.03em]">−{mxn(t.amount)}</span>
+                <span className="whitespace-nowrap font-semibold tracking-[-0.03em]">−{mxn(t.amount)}</span>
               </div>
             </div>
           ))}
