@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,7 +72,7 @@ fun ReportsScreen(vm: ReportsViewModel, onBack: () -> Unit) {
 
 @Composable
 private fun TrendCard(title: String, rows: List<TrendRow>) {
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             if (rows.isEmpty()) Text("Sin gastos en estos periodos.", style = MaterialTheme.typography.bodySmall)

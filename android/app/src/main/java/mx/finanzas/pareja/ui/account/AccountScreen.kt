@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -20,7 +20,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.Switch
+import mx.finanzas.pareja.ui.components.AppSwitch
 import androidx.compose.ui.Alignment
 import mx.finanzas.pareja.alerts.AlertNotifier
 import mx.finanzas.pareja.alerts.AlertPrefs
@@ -47,6 +47,35 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mx.finanzas.pareja.data.MemberRole
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.unit.sp
+import mx.finanzas.pareja.ui.AppTheme
+import mx.finanzas.pareja.ui.components.GlassCard
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import mx.finanzas.pareja.ui.ThemePrefs
+import mx.finanzas.pareja.ui.ThemeStyle
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.lock.AppAuth
 import mx.finanzas.pareja.ui.lock.AppLockState
@@ -69,7 +98,7 @@ private fun CaptureCard() {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Captura automática de cobros", style = MaterialTheme.typography.titleMedium)
             Text(
@@ -92,7 +121,7 @@ private fun VersionCard() {
     val controller = (LocalContext.current.applicationContext as FinanzasApp).updates
     val state by controller.state.collectAsStateWithLifecycle()
 
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Versión ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
             Text(
@@ -138,7 +167,7 @@ private fun LockCard() {
         )
     }
 
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -146,7 +175,7 @@ private fun LockCard() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Bloqueo de la app", style = MaterialTheme.typography.titleMedium)
-                Switch(checked = enabled, onCheckedChange = { change(it) })
+                AppSwitch(checked = enabled, onCheckedChange = { change(it) })
             }
             Text(
                 "Pide tu huella o el PIN del teléfono al abrir la app y al volver después de 30 segundos. " +
@@ -184,7 +213,7 @@ private fun AlertsCard() {
         apply(granted)
     }
 
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -192,7 +221,7 @@ private fun AlertsCard() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Alertas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Switch(
+                AppSwitch(
                     checked = enabled,
                     onCheckedChange = { on ->
                         when {
@@ -233,7 +262,7 @@ private fun AlertsCard() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(
+                    AppSwitch(
                         checked = chargeAlerts,
                         onCheckedChange = { on ->
                             AlertPrefs.setChargeAlertsEnabled(context, on)
@@ -265,7 +294,7 @@ private fun UnparsedCard() {
     var items by remember { mutableStateOf(log.all()) }
     val clipboard = LocalClipboardManager.current
 
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Notificaciones no reconocidas", style = MaterialTheme.typography.titleMedium)
             Text(
@@ -300,6 +329,66 @@ private fun UnparsedCard() {
 
 private const val MAX_UNPARSED_SHOWN = 10
 
+/** Muestra de cada apariencia en miniatura (el fondo que tendrá la app). */
+private fun previewBrush(style: ThemeStyle): Brush = when (style) {
+    ThemeStyle.DARK -> Brush.verticalGradient(listOf(Color(0xFF0A2A4A), Color(0xFF1A1442), Color(0xFF4A1D4D)))
+    ThemeStyle.LIGHT -> Brush.verticalGradient(
+        0f to Color(0xFF6B4DF0), 0.4f to Color(0xFFB04FD8), 0.4f to Color(0xFFF4F0FF), 1f to Color(0xFFF4F0FF),
+    )
+    ThemeStyle.MINIMAL -> SolidColor(Color(0xFF0E0F13))
+}
+
+/** Apariencia de la app en este teléfono: se aplica al instante y se recuerda. */
+@Composable
+internal fun AppearanceCard() {
+    val context = LocalContext.current
+    val current by ThemePrefs.style(context).collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ThemeStyle.entries.forEach { style ->
+                    val selected = style == current
+                    Column(
+                        Modifier.weight(1f).selectable(
+                            selected = selected,
+                            role = Role.RadioButton,
+                            onClick = { ThemePrefs.set(context, style) },
+                        ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            Modifier.fillMaxWidth().height(84.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(previewBrush(style))
+                                .border(
+                                    if (selected) 2.dp else 1.dp,
+                                    if (selected) MaterialTheme.colorScheme.onSurface else AppTheme.tokens.glassBorder,
+                                    RoundedCornerShape(18.dp),
+                                ),
+                        ) {
+                            if (selected) {
+                                Box(
+                                    Modifier.align(Alignment.TopEnd).padding(8.dp).size(20.dp)
+                                        .clip(CircleShape).background(Color.White),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF1A1442), modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                        Text(
+                            style.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun AccountScreen(
     vm: AccountViewModel,
@@ -307,6 +396,8 @@ fun AccountScreen(
     onSignOut: () -> Unit,
     onOpenBudgets: () -> Unit,
     onOpenReports: () -> Unit,
+    onOpenTutorials: () -> Unit,
+    onOpenFriends: () -> Unit,
 ) {
     val inviteCode by vm.inviteCode.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -314,54 +405,35 @@ fun AccountScreen(
     val isAdmin = session.me.role == MemberRole.ADMIN
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Cuenta", style = MaterialTheme.typography.headlineSmall)
+        Text("Cuenta", style = MaterialTheme.typography.headlineMedium)
 
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Integrantes del hogar", style = MaterialTheme.typography.titleMedium)
-                session.members.forEach { member ->
-                    val role = if (member.role == MemberRole.ADMIN) "administrador" else "integrante"
-                    val you = if (member.userId == session.userId) " (tú)" else ""
-                    Text("${member.displayName}$you · $role")
-                }
-                if (session.members.size < 2) {
-                    Text(
-                        "Falta tu pareja: comparte un código de invitación.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+        ProfileCard(
+            session = session,
+            isAdmin = isAdmin,
+            inviteCode = inviteCode,
+            message = message,
+            onInvite = vm::createInvite,
+            onCopy = { clipboard.setText(AnnotatedString(it)) },
+        )
+
+        SectionLabel("APARIENCIA")
+        AppearanceCard()
+
+        SectionLabel("GENERAL")
+        GlassCard(Modifier.fillMaxWidth()) {
+            Column {
+                GroupRow("Amigos y saldos", onOpenFriends)
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppTheme.tokens.glassBorder)
+                GroupRow("Tutoriales", onOpenTutorials)
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppTheme.tokens.glassBorder)
+                GroupRow("Presupuestos por categoría", onOpenBudgets)
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppTheme.tokens.glassBorder)
+                GroupRow("Reportes: mes contra mes", onOpenReports)
             }
-        }
-
-        if (isAdmin) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Invitar a tu pareja", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "El código sirve una sola vez y vence en 7 días.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    inviteCode?.let { code ->
-                        Text(code, style = MaterialTheme.typography.headlineSmall)
-                        OutlinedButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Copiar código") }
-                    }
-                    Button(onClick = vm::createInvite) {
-                        Text(if (inviteCode == null) "Generar código" else "Generar otro")
-                    }
-                    ErrorText(message)
-                }
-            }
-        }
-
-        OutlinedButton(onClick = onOpenBudgets, modifier = Modifier.fillMaxWidth()) {
-            Text("Presupuestos por categoría")
-        }
-        OutlinedButton(onClick = onOpenReports, modifier = Modifier.fillMaxWidth()) {
-            Text("Reportes: mes contra mes")
         }
         LockCard()
         AlertsCard()
@@ -369,6 +441,129 @@ fun AccountScreen(
         UnparsedCard()
         VersionCard()
 
-        OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Cerrar sesión") }
+        val danger = MaterialTheme.colorScheme.error
+        Surface(
+            onClick = onSignOut,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = danger.copy(alpha = 0.12f),
+            border = BorderStroke(1.dp, danger.copy(alpha = 0.45f)),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("Cerrar sesión", color = danger, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+        modifier = Modifier.padding(start = 2.dp, top = 8.dp),
+    )
+}
+
+/** Fila de la lista GENERAL: título y flecha; toda la fila es el botón. */
+@Composable
+private fun GroupRow(title: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 54.dp).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun Avatar(name: String, size: androidx.compose.ui.unit.Dp, colors: List<Color>, fontSize: Int) {
+    Box(
+        Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(colors)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(name.take(1).uppercase(), color = Color.White, fontSize = fontSize.sp, fontWeight = FontWeight.ExtraBold)
+    }
+}
+
+/** Perfil y hogar: tu avatar, cuántos son, los demás integrantes y (si eres administrador) el acceso a invitar. */
+@Composable
+private fun ProfileCard(
+    session: SessionState.Ready,
+    isAdmin: Boolean,
+    inviteCode: String?,
+    message: String?,
+    onInvite: () -> Unit,
+    onCopy: (String) -> Unit,
+) {
+    val tokens = AppTheme.tokens
+    val gradients = listOf(
+        listOf(Color(0xFFFF6FA8), Color(0xFFFFB547)),
+        listOf(Color(0xFF3DD6D0), Color(0xFF4F8CFF)),
+        listOf(Color(0xFF8B7CFF), Color(0xFFFF6FA8)),
+    )
+    val me = session.members.firstOrNull { it.userId == session.userId }
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Avatar(me?.displayName ?: "?", 60.dp, gradients[0], 22)
+                Column(Modifier.weight(1f)) {
+                    Text(me?.displayName ?: "Tú", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Hogar · ${session.members.size} ${if (session.members.size == 1) "integrante" else "integrantes"}",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                    )
+                    Row(Modifier.padding(top = 8.dp)) {
+                        session.members.forEachIndexed { index, member ->
+                            Box(Modifier.padding(start = if (index == 0) 0.dp else 0.dp).offset(x = (-8 * index).dp)) {
+                                Avatar(member.displayName, 26.dp, gradients[index % gradients.size], 11)
+                            }
+                        }
+                    }
+                }
+                if (isAdmin) {
+                    Surface(
+                        onClick = onInvite,
+                        shape = CircleShape,
+                        color = tokens.glass,
+                        border = BorderStroke(1.dp, tokens.glassBorder),
+                    ) {
+                        Box(Modifier.height(40.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+                            Text(if (inviteCode == null) "Invitar" else "Otro código", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            session.members.forEach { member ->
+                val role = if (member.role == MemberRole.ADMIN) "administrador" else "integrante"
+                val you = if (member.userId == session.userId) " (tú)" else ""
+                Text("${member.displayName}$you · $role", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f))
+            }
+            if (session.members.size < 2) {
+                Text(
+                    if (isAdmin) "Falta tu pareja: toca Invitar para generar un código." else "Falta tu pareja.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            inviteCode?.let { code ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text(code, style = MaterialTheme.typography.headlineSmall)
+                    TextButton(onClick = { onCopy(code) }) { Text("Copiar código") }
+                }
+                Text("El código sirve una sola vez y vence en 7 días.", style = MaterialTheme.typography.bodySmall)
+            }
+            ErrorText(message)
+        }
     }
 }

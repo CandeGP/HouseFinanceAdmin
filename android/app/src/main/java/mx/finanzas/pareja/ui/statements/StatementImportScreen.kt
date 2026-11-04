@@ -14,7 +14,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
+import mx.finanzas.pareja.ui.components.GradientButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -93,7 +94,7 @@ fun StatementImportScreen(
                             "y te muestra qué falta, sin cambiar nada hasta que confirmes.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(
+                    GradientButton(
                         onClick = { pick.launch(arrayOf("application/pdf")) },
                         enabled = !reading,
                         modifier = Modifier.fillMaxWidth(),
@@ -113,7 +114,7 @@ fun StatementImportScreen(
                         "La tarjeta quedó con el corte, pago y límite de tu estado de cuenta.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") }
+                    GradientButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") }
                 }
             }
         }
@@ -276,7 +277,7 @@ private fun ReviewContent(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Button(onClick = vm::import, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+    GradientButton(onClick = vm::import, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
         Text(if (state.busy) "Importando…" else "Importar")
     }
     OutlinedButton(onClick = onPickAnother, modifier = Modifier.fillMaxWidth()) { Text("Elegir otro PDF") }
@@ -284,7 +285,7 @@ private fun ReviewContent(
 
 @Composable
 private fun SummaryCard(s: StatementSummary) {
-    Card(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 listOfNotNull(s.bank, s.cardLast4?.let { "•••• $it" }).joinToString(" ").ifBlank { "Estado de cuenta" },

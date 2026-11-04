@@ -14,11 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.FloatingActionButton
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +44,28 @@ import mx.finanzas.pareja.domain.localDate
 import mx.finanzas.pareja.domain.timeText
 import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import mx.finanzas.pareja.ui.AppTheme
+import mx.finanzas.pareja.ui.components.GlassCard
+import mx.finanzas.pareja.ui.components.MonthSummaryCard
+import mx.finanzas.pareja.ui.components.SelectChip
+import mx.finanzas.pareja.ui.dashboard.Scope
 import mx.finanzas.pareja.ui.components.ScopeToggle
 
 @Composable
@@ -55,7 +75,6 @@ fun PaymentsScreen(
     memberNames: Map<String, String>,
     zone: TimeZone,
     refreshKey: Int,
-    onNew: () -> Unit,
     onEdit: (String) -> Unit,
     onOpenLoans: () -> Unit,
 ) {
@@ -68,44 +87,47 @@ fun PaymentsScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            FloatingActionButton(onClick = onNew) { Icon(Icons.Filled.Add, contentDescription = "Nuevo pago") }
-        },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = vm::previousMonth) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Mes anterior")
-                    }
-                    Text(formatMonthEs(state.year, state.month), style = MaterialTheme.typography.titleMedium)
-                    IconButton(onClick = vm::nextMonth) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Mes siguiente")
-                    }
-                }
-                ScopeToggle(scope = state.scope, onChange = vm::setScope)
+                SelectChip("Míos", state.scope == Scope.MINE, { vm.setScope(Scope.MINE) })
+                SelectChip("Ambos", state.scope == Scope.BOTH, { vm.setScope(Scope.BOTH) })
             }
-            Text(
-                "Efectivo y transferencias: ${formatMxn(total)}",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            MonthSummaryCard(
+                monthLabel = formatMonthEs(state.year, state.month),
+                count = state.items.size,
+                total = total,
+                onPrevious = vm::previousMonth,
+                onNext = vm::nextMonth,
+                noun = "pagos",
             )
-            OutlinedButton(onClick = onOpenLoans, modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text("Préstamos entre personas")
+            GlassCard(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp),
+                onClick = onOpenLoans,
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 16.dp, vertical = 6.dp).heightIn(min = 54.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Outlined.AccountBalance, contentDescription = null, tint = AppTheme.tokens.chart[0])
+                    Text("Préstamos entre personas", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
             }
             if (withoutProof > 0) {
                 Text(
                     "$withoutProof sin comprobante",
-                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(start = 22.dp, top = 8.dp),
                 )
             }
-            ErrorText(state.error, Modifier.padding(horizontal = 16.dp))
+            ErrorText(state.error, Modifier.padding(horizontal = 20.dp))
 
             if (state.items.isEmpty() && !state.loading) {
                 EmptyState(
@@ -114,7 +136,7 @@ fun PaymentsScreen(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.items, key = { it.id }) { payment ->
@@ -145,6 +167,8 @@ fun PaymentsScreen(
     }
 }
 
+/** Un pago: palomita verde en recuadro, concepto, fecha y método, comprobante y monto. Mantener presionado elimina. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PaymentRow(
     payment: ManualPayment,
@@ -154,14 +178,32 @@ private fun PaymentRow(
     onDelete: (() -> Unit)?,
 ) {
     val method = if (payment.method == PaymentMethod.CASH) "Efectivo" else "Transferencia"
-    Card(modifier = Modifier.fillMaxWidth().let { if (onClick != null) it.clickable(onClick = onClick) else it }) {
+    val success = AppTheme.tokens.success
+    GlassCard(
+        modifier = Modifier.fillMaxWidth()
+            .semantics { if (onDelete != null) customActions = listOf(CustomAccessibilityAction("Eliminar") { onDelete(); true }) }
+            .then(
+                if (onClick != null || onDelete != null) {
+                    Modifier.combinedClickable(
+                        onClickLabel = "Editar pago",
+                        onClick = { onClick?.invoke() },
+                        onLongClickLabel = "Eliminar pago",
+                        onLongClick = onDelete,
+                    )
+                } else Modifier,
+            ),
+    ) {
         Row(
-            Modifier.padding(12.dp),
+            Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(payment.concept, style = MaterialTheme.typography.titleSmall)
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(success.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.Check, contentDescription = null, tint = success, modifier = Modifier.size(18.dp)) }
+            Column(Modifier.weight(1f)) {
+                Text(payment.concept, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Text(
                     listOfNotNull(
                         "${formatDayMonthEs(localDate(payment.paidAt, zone))} ${timeText(payment.paidAt, zone)}",
@@ -169,20 +211,19 @@ private fun PaymentRow(
                         payment.counterparty,
                         ownerName?.let { "de $it" },
                     ).joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (payment.evidencePath != null) {
-                    Text("Con comprobante", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text("Con comprobante", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 } else {
-                    Text("Sin comprobante", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                    Text("Sin comprobante", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                 }
-                if (!payment.notes.isNullOrBlank()) Text(payment.notes, style = MaterialTheme.typography.bodySmall)
+                if (!payment.notes.isNullOrBlank()) Text(payment.notes, style = MaterialTheme.typography.bodySmall, maxLines = 2)
             }
-            Text(formatMxn(payment.amount), style = MaterialTheme.typography.titleSmall)
-            if (onDelete != null) {
-                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Eliminar") }
-            }
+            Text(formatMxn(payment.amount), fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

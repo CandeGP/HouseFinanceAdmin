@@ -4,6 +4,10 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
@@ -34,6 +38,7 @@ fun createSupabase(url: String, key: String): SupabaseClient =
     }
 
 private const val PAYEES_LOOKBACK = 500L // últimos pagos que se revisan para sugerir "Pagado a"
+private const val LOGIN_TIMEOUT_MS = 15_000
 private const val LOANS_LIMIT = 500L // préstamos y abonos que se cargan a la vez
 
 @Serializable
@@ -50,10 +55,30 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
         return client.auth.currentUserOrNull()?.id
     }
 
+    // Entra por la función `login` del servidor, que aplica el rate limit (cubetas por IP y por usuario).
     override suspend fun signIn(email: String, password: String) {
-        client.auth.signInWith(Email) {
-            this.email = email
-            this.password = password
+        val tokens = withContext(Dispatchers.IO) { requestLogin(email, password) }
+        client.auth.importAuthToken(tokens.accessToken, tokens.refreshToken)
+    }
+
+    private fun requestLogin(email: String, password: String): LoginTokens {
+        val connection = URL("${client.supabaseUrl}/functions/v1/login").openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = LOGIN_TIMEOUT_MS
+            connection.readTimeout = LOGIN_TIMEOUT_MS
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("apikey", client.supabaseKey)
+            connection.setRequestProperty("Authorization", "Bearer ${client.supabaseKey}")
+            val payload = buildJsonObject { put("email", email); put("password", password) }.toString()
+            connection.outputStream.use { it.write(payload.toByteArray()) }
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            return parseLoginResponse(status, body, connection.getHeaderField("Retry-After"))
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -141,6 +166,12 @@ class SupabaseFinanceRepository(private val client: SupabaseClient) : FinanceRep
 
     override suspend fun editCard(id: String, patch: CardEditPatch) {
         client.postgrest.from("cards").update(patch) {
+            filter { eq("id", id) }
+        }
+    }
+
+    override suspend fun setCardFrozen(id: String, frozen: Boolean) {
+        client.postgrest.from("cards").update(mapOf("frozen" to frozen)) {
             filter { eq("id", id) }
         }
     }

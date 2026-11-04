@@ -13,7 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -110,7 +110,7 @@ private fun BudgetRow(row: CategoryBudgetRow, onClick: () -> Unit) {
         BudgetLevel.NEAR -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.tertiary
     }
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    GlassCard(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(row.category.name, style = MaterialTheme.typography.titleMedium)
             if (budget == null) {

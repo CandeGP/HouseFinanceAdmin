@@ -171,6 +171,10 @@ class FakeFinanceRepository : FinanceRepository {
         }
     }
 
+    override suspend fun setCardFrozen(id: String, frozen: Boolean) {
+        cardList = cardList.map { if (it.id == id) it.copy(frozen = frozen) else it }
+    }
+
     override suspend fun archiveCard(id: String) {
         archivedCards += id
         cardList = cardList.map { if (it.id == id) it.copy(archived = true) else it }

@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,27 +38,33 @@ import mx.finanzas.pareja.domain.MsiMonth
 import mx.finanzas.pareja.domain.cardLabel
 import mx.finanzas.pareja.domain.formatMxn
 import mx.finanzas.pareja.domain.pendingInstallments
+import mx.finanzas.pareja.ui.AppTheme
+import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 import mx.finanzas.pareja.ui.components.ScopeToggle
+import mx.finanzas.pareja.ui.components.UsageBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: () -> Unit) {
+fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: (() -> Unit)?) {
     val state by vm.state.collectAsStateWithLifecycle()
     // El primer mes va abierto; el resto se despliega al tocarlo.
     var open by remember { mutableStateOf<Set<String>>(emptySet()) }
     val firstLabel = state.months.firstOrNull()?.label
 
     Scaffold(
+        // Sin barra superior cuando va como pestaña dentro de Gastos (no hay a dónde volver).
         topBar = {
-            TopAppBar(
-                title = { Text("Compras a meses") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-            )
+            if (onBack != null) {
+                TopAppBar(
+                    title = { Text("Compras a meses") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        }
+                    },
+                )
+            }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -71,12 +77,10 @@ fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: () -> Unit) {
                     Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) { CircularProgressIndicator() }
-                state.months.isEmpty() -> Text(
-                    "No hay mensualidades pendientes. Las compras a meses que registres (a mano o desde un estado " +
-                        "de cuenta) aparecen aquí, mes por mes.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
+                state.months.isEmpty() -> EmptyState(
+                    title = "Sin mensualidades pendientes",
+                    subtitle = "Las compras a meses que registres (a mano o desde un estado de cuenta) aparecen aquí, mes por mes.",
+                    icon = Icons.Outlined.CalendarMonth,
                 )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(16.dp),
@@ -87,6 +91,7 @@ fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: () -> Unit) {
                         val expanded = month.label in open || (open.isEmpty() && month.label == firstLabel)
                         MonthCard(
                             month = month,
+                            maxTotal = state.months.maxOf { it.total },
                             expanded = expanded,
                             cards = state.cards,
                             onToggle = {
@@ -104,11 +109,9 @@ fun InstallmentsScreen(vm: InstallmentsViewModel, onBack: () -> Unit) {
 @Composable
 private fun SummaryCard(months: List<MsiMonth>) {
     val pending = pendingInstallments(months)
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        ),
+    GlassCard(
+        container = AppTheme.tokens.quincenaSecond,
+        contentColor = AppTheme.tokens.onQuincenaSecond,
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Te falta pagar de compras a meses", style = MaterialTheme.typography.labelLarge)
@@ -122,8 +125,8 @@ private fun SummaryCard(months: List<MsiMonth>) {
 }
 
 @Composable
-private fun MonthCard(month: MsiMonth, expanded: Boolean, cards: Map<String, CardModel>, onToggle: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
+private fun MonthCard(month: MsiMonth, maxTotal: Double, expanded: Boolean, cards: Map<String, CardModel>, onToggle: () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -137,6 +140,7 @@ private fun MonthCard(month: MsiMonth, expanded: Boolean, cards: Map<String, Car
                 }
                 Text(formatMxn(month.total), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
+            UsageBar(fraction = if (maxTotal > 0) (month.total / maxTotal).toFloat() else 0f)
             if (expanded) month.items.forEach { InstallmentRow(it, cards[it.cardId]) }
         }
     }

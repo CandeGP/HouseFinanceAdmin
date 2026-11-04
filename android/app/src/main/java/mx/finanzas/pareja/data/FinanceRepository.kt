@@ -73,6 +73,7 @@ interface FinanceRepository {
 
     /** Guarda la edición completa de una tarjeta propia (datos, presupuesto y color). */
     suspend fun editCard(id: String, patch: CardEditPatch)
+    suspend fun setCardFrozen(id: String, frozen: Boolean)
     suspend fun archiveCard(id: String)
 
     /** Deshace [archiveCard]: la tarjeta vuelve a mostrarse con todos sus gastos. */

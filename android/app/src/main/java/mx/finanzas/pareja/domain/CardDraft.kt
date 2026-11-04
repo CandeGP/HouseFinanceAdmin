@@ -9,6 +9,8 @@ data class ValidCard(
     val creditLimit: Double,
     val cutoffDay: Int,
     val dueDay: Int,
+    /** Color elegido para la tarjeta; null deja el de su banco. */
+    val color: String? = null,
 )
 
 sealed interface CardDraftResult {
@@ -72,6 +74,7 @@ data class CardDraft(
     val limitText: String = "",
     val cutoffText: String = "",
     val dueText: String = "",
+    val color: String? = null,
 ) {
     fun validate(): CardDraftResult {
         val errors = linkedMapOf<CardField, String>()
@@ -99,6 +102,7 @@ data class CardDraft(
                 creditLimit = requireNotNull(limit),
                 cutoffDay = requireNotNull(cutoff),
                 dueDay = requireNotNull(due),
+                color = color?.trim()?.takeIf { HEX_COLOR.matches(it) }?.uppercase(),
             ),
         )
     }

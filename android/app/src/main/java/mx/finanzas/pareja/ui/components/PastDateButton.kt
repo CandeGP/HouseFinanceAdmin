@@ -1,10 +1,17 @@
 package mx.finanzas.pareja.ui.components
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,8 +43,15 @@ fun PastDateButton(
 ) {
     var showPicker by remember { mutableStateOf(false) }
 
-    OutlinedButton(onClick = { showPicker = true }, modifier = modifier.fillMaxWidth()) {
-        Text("Fecha: " + if (date == null || date == today) "hoy" else formatDateEs(date))
+    GlassCard(modifier.fillMaxWidth(), onClick = { showPicker = true }) {
+        Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Fecha", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                if (date == null || date == today) "hoy" else formatDateEs(date),
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+            )
+        }
     }
 
     if (showPicker) {

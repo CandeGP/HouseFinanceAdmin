@@ -9,6 +9,8 @@ private const val MAX_MESSAGE_LENGTH = 200
  * Nunca devuelve cabeceras, URL ni tokens: los errores de PostgREST los traen en el texto.
  */
 fun userMessage(error: Throwable): String {
+    if (error is RateLimitedException) return "Demasiados intentos. Vuelve a intentar en ${error.retryAfterSeconds} s."
+    if (error is LoginUnavailableException) return "No se pudo iniciar sesión. Intenta de nuevo en un momento."
     val raw = cleanMessage(error)
     return when {
         raw.contains("Invalid login credentials", ignoreCase = true) -> "Correo o contraseña incorrectos"

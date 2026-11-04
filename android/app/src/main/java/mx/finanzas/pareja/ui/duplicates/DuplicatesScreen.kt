@@ -10,8 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,6 +32,7 @@ import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.TxSource
 import mx.finanzas.pareja.domain.cardLabel
 import mx.finanzas.pareja.domain.formatMxn
+import mx.finanzas.pareja.ui.components.EmptyState
 import mx.finanzas.pareja.ui.components.ErrorText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,18 +53,17 @@ fun DuplicatesScreen(vm: DuplicatesViewModel, userId: String, onBack: () -> Unit
             ErrorText(state.message, Modifier.padding(horizontal = 16.dp))
             when {
                 state.loading -> CircularProgressIndicator(Modifier.padding(16.dp))
-                state.pairs.isEmpty() -> Text(
-                    "No hay cargos que parezcan duplicados en los últimos $DUPLICATES_LOOKBACK_DAYS días.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
+                state.pairs.isEmpty() -> EmptyState(
+                    title = "Todo en orden",
+                    subtitle = "No hay cargos que parezcan duplicados en los últimos $DUPLICATES_LOOKBACK_DAYS días.",
+                    icon = Icons.Outlined.ContentCopy,
                 )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(state.pairs, key = { it.key }) { pair ->
-                        Card(Modifier.fillMaxWidth()) {
+                        GlassCard(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf(pair.first, pair.second).forEach { tx ->
                                     TxLine(tx, state.cards[tx.cardId]?.let { cardLabel(it) })

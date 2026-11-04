@@ -3,7 +3,11 @@ package mx.finanzas.pareja.ui.payments
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +48,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -62,9 +69,15 @@ import mx.finanzas.pareja.domain.formatDateEs
 import mx.finanzas.pareja.domain.matchingPayees
 import mx.finanzas.pareja.domain.timeText
 import mx.finanzas.pareja.ui.components.DropdownField
+import mx.finanzas.pareja.ui.components.AuthField
 import mx.finanzas.pareja.ui.components.ErrorText
+import mx.finanzas.pareja.ui.components.GlassCard
+import mx.finanzas.pareja.ui.components.GradientButton
+import mx.finanzas.pareja.ui.components.SectionLabel
+import mx.finanzas.pareja.ui.components.SelectChip
+import mx.finanzas.pareja.ui.transactions.AmountInput
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PaymentFormScreen(
     vm: ManualPaymentFormViewModel,
@@ -97,149 +110,127 @@ fun PaymentFormScreen(
 
     val draft = state.draft
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (vm.isEditing) "Editar pago" else "Nuevo pago") },
-                navigationIcon = {
-                    IconButton(onClick = { onDone(false) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ErrorText(state.message)
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = draft.method == PaymentMethod.CASH,
-                    onClick = { vm.onDraftChange(draft.copy(method = PaymentMethod.CASH)) },
-                    enabled = !state.readOnly,
-                    label = { Text("Efectivo") },
-                )
-                FilterChip(
-                    selected = draft.method == PaymentMethod.TRANSFER,
-                    onClick = { vm.onDraftChange(draft.copy(method = PaymentMethod.TRANSFER)) },
-                    enabled = !state.readOnly,
-                    label = { Text("Transferencia") },
-                )
-            }
-
-            OutlinedTextField(
-                value = draft.concept,
-                onValueChange = { vm.onDraftChange(draft.copy(concept = it)) },
-                label = { Text("Concepto") },
-                singleLine = true,
-                enabled = !state.readOnly,
-                isError = state.errors[PaymentField.CONCEPT] != null,
-                supportingText = state.errors[PaymentField.CONCEPT]?.let { { Text(it) } },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = draft.amountText,
-                onValueChange = { vm.onDraftChange(draft.copy(amountText = it)) },
-                label = { Text("Monto (MXN)") },
-                singleLine = true,
-                enabled = !state.readOnly,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                isError = state.errors[PaymentField.AMOUNT] != null,
-                supportingText = state.errors[PaymentField.AMOUNT]?.let { { Text(it) } },
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
-                OutlinedButton(
-                    onClick = { showDatePicker = true },
-                    enabled = !state.readOnly,
-                    modifier = Modifier.weight(1f).padding(top = 8.dp),
-                ) { Text(formatDateEs(draft.date)) }
-                OutlinedTextField(
-                    value = draft.timeText,
-                    onValueChange = { vm.onDraftChange(draft.copy(timeText = it)) },
-                    label = { Text("Hora (HH:mm)") },
-                    singleLine = true,
-                    enabled = !state.readOnly,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = state.errors[PaymentField.TIME] != null,
-                    supportingText = state.errors[PaymentField.TIME]?.let { { Text(it) } },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            TextButton(
-                onClick = {
-                    val now: Instant = Clock.System.now()
-                    vm.onDraftChange(
-                        draft.copy(date = now.toLocalDateTime(zone).date, timeText = timeText(now, zone)),
+    Scaffold { padding ->
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().height(48.dp)) {
+                    TextButton(onClick = { onDone(false) }, modifier = Modifier.align(Alignment.CenterStart)) { Text("Cancelar") }
+                    Text(
+                        if (vm.isEditing) "Editar pago" else "Registrar pago",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.align(Alignment.Center),
                     )
-                },
-                enabled = !state.readOnly,
-            ) { Text("Usar fecha y hora actuales") }
+                }
+                ErrorText(state.message)
 
-            PayeeField(
-                value = draft.counterparty,
-                payees = state.payees,
-                enabled = !state.readOnly,
-                onChange = { vm.onDraftChange(draft.copy(counterparty = it)) },
-            )
-            if (draft.method == PaymentMethod.TRANSFER) {
-                OutlinedTextField(
-                    value = draft.reference,
-                    onValueChange = { vm.onDraftChange(draft.copy(reference = it)) },
-                    label = { Text("Clave de rastreo / referencia (opcional)") },
-                    singleLine = true,
-                    enabled = !state.readOnly,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            DropdownField(
-                label = "Categoría",
-                selectedLabel = state.categories.firstOrNull { it.id == draft.categoryId }?.name ?: "Sin categoría",
-                options = state.categories,
-                optionLabel = { it.name },
-                onSelect = { vm.onDraftChange(draft.copy(categoryId = it?.id)) },
-                enabled = !state.readOnly,
-                noneLabel = "Sin categoría",
-            )
-            if (!state.readOnly) {
-                TextButton(onClick = { newCategory = "" }) { Text("Agregar categoría") }
-            }
-            OutlinedTextField(
-                value = draft.notes,
-                onValueChange = { vm.onDraftChange(draft.copy(notes = it)) },
-                label = { Text("Notas (opcional)") },
-                enabled = !state.readOnly,
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Text("Comprobante", style = MaterialTheme.typography.titleSmall)
-            EvidencePreview(state)
-            if (!state.readOnly) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        val uri = newCameraUri(context)
-                        cameraUri = uri
-                        takePhoto.launch(uri)
-                    }) { Text("Tomar foto") }
-                    OutlinedButton(onClick = { pickFile.launch(arrayOf("image/*", "application/pdf")) }) {
-                        Text("Elegir archivo")
+                    SelectChip("Efectivo", draft.method == PaymentMethod.CASH, { vm.onDraftChange(draft.copy(method = PaymentMethod.CASH)) }, enabled = !state.readOnly)
+                    SelectChip("Transferencia", draft.method == PaymentMethod.TRANSFER, { vm.onDraftChange(draft.copy(method = PaymentMethod.TRANSFER)) }, enabled = !state.readOnly)
+                }
+
+                AmountInput(
+                    value = draft.amountText,
+                    onChange = { vm.onDraftChange(draft.copy(amountText = it)) },
+                    enabled = !state.readOnly,
+                    error = state.errors[PaymentField.AMOUNT],
+                )
+
+                AuthField(
+                    label = "Concepto",
+                    value = draft.concept,
+                    onValueChange = { vm.onDraftChange(draft.copy(concept = it)) },
+                    placeholder = "Ej. Renta, mandado",
+                    enabled = !state.readOnly,
+                    error = state.errors[PaymentField.CONCEPT],
+                )
+
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().height(52.dp)
+                            .clickable(enabled = !state.readOnly, role = Role.Button) { showDatePicker = true }
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Fecha", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text(formatDateEs(draft.date), fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f))
                     }
                 }
-                if (state.hasEvidence) {
-                    TextButton(onClick = vm::removeEvidence) { Text("Quitar comprobante") }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
+                    AuthField(
+                        label = "Hora (HH:mm)",
+                        value = draft.timeText,
+                        onValueChange = { vm.onDraftChange(draft.copy(timeText = it)) },
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.readOnly,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        error = state.errors[PaymentField.TIME],
+                    )
+                    TextButton(
+                        onClick = {
+                            val now: Instant = Clock.System.now()
+                            vm.onDraftChange(draft.copy(date = now.toLocalDateTime(zone).date, timeText = timeText(now, zone)))
+                        },
+                        enabled = !state.readOnly,
+                    ) { Text("Ahora") }
+                }
+
+                PayeeField(
+                    value = draft.counterparty,
+                    payees = state.payees,
+                    enabled = !state.readOnly,
+                    onChange = { vm.onDraftChange(draft.copy(counterparty = it)) },
+                )
+                if (draft.method == PaymentMethod.TRANSFER) {
+                    AuthField(
+                        label = "Clave de rastreo / referencia (opcional)",
+                        value = draft.reference,
+                        onValueChange = { vm.onDraftChange(draft.copy(reference = it)) },
+                        enabled = !state.readOnly,
+                    )
+                }
+
+                SectionLabel("CATEGORÍA")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SelectChip("Sin categoría", draft.categoryId == null, { vm.onDraftChange(draft.copy(categoryId = null)) }, enabled = !state.readOnly)
+                    state.categories.forEach { category ->
+                        SelectChip(category.name, draft.categoryId == category.id, { vm.onDraftChange(draft.copy(categoryId = category.id)) }, enabled = !state.readOnly)
+                    }
+                    if (!state.readOnly) SelectChip("+ Nueva", false, { newCategory = "" })
+                }
+
+                AuthField(
+                    label = "Notas (opcional)",
+                    value = draft.notes,
+                    onValueChange = { vm.onDraftChange(draft.copy(notes = it)) },
+                    enabled = !state.readOnly,
+                    singleLine = false,
+                )
+
+                SectionLabel("COMPROBANTE")
+                EvidencePreview(state)
+                if (!state.readOnly) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SelectChip("Tomar foto", false, {
+                            val uri = newCameraUri(context)
+                            cameraUri = uri
+                            takePhoto.launch(uri)
+                        })
+                        SelectChip("Elegir archivo", false, { pickFile.launch(arrayOf("image/*", "application/pdf")) })
+                        if (state.hasEvidence) SelectChip("Quitar", false, vm::removeEvidence)
+                    }
                 }
             }
-
-            Button(
+            GradientButton(
                 onClick = vm::save,
                 enabled = !state.saving && !state.readOnly && !state.loading,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (state.saving) "Guardando…" else "Guardar") }
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            ) { Text(if (state.saving) "Guardando…" else "Guardar pago") }
         }
     }
 
@@ -300,15 +291,13 @@ internal fun PayeeField(
     val matches = matchingPayees(payees, value)
     val open = expanded && enabled && matches.isNotEmpty()
     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { expanded = it }) {
-        OutlinedTextField(
+        AuthField(
+            label = label,
             value = value,
             onValueChange = { onChange(it); expanded = true },
-            label = { Text(label) },
-            isError = error != null,
-            supportingText = error?.let { { Text(it) } },
-            singleLine = true,
+            error = error,
             enabled = enabled,
-            trailingIcon = { if (payees.isNotEmpty()) ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
+            trailing = { if (payees.isNotEmpty()) ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable, enabled).fillMaxWidth(),
         )
         ExposedDropdownMenu(expanded = open, onDismissRequest = { expanded = false }) {

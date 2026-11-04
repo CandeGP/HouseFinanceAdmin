@@ -1,6 +1,16 @@
 package mx.finanzas.pareja.ui.loans
 
 import androidx.compose.foundation.clickable
+import mx.finanzas.pareja.ui.dashboard.Scope
+import mx.finanzas.pareja.ui.components.SelectChip
+import mx.finanzas.pareja.ui.AppTheme
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,7 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -73,9 +83,13 @@ fun LoansScreen(
     memberNames: Map<String, String>,
     today: LocalDate,
     onBack: () -> Unit,
+    /** Llegar desde el menú del «+» abre directo el formulario de préstamo nuevo. */
+    openNewOnStart: Boolean = false,
+    /** Nombre que llega precargado al abrir el formulario desde el detalle de un amigo. */
+    newPerson: String = "",
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var showNew by remember { mutableStateOf(false) }
+    var showNew by remember { mutableStateOf(openNewOnStart) }
     var repayFor by remember { mutableStateOf<LoanView?>(null) }
     var editRepayment by remember { mutableStateOf<Pair<LoanView, LoanRepayment>?>(null) }
     var deleteLoan by remember { mutableStateOf<LoanView?>(null) }
@@ -102,26 +116,24 @@ fun LoansScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showNew = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Nuevo préstamo")
+            FloatingActionButton(
+                onClick = { showNew = true },
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                modifier = Modifier.background(AppTheme.tokens.accent, androidx.compose.foundation.shape.CircleShape),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Nuevo préstamo", tint = AppTheme.tokens.onAccent)
             }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("Te deben ${formatMxn(state.totals.owedToYou)}", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Debes ${formatMxn(state.totals.youOwe)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                ScopeToggle(scope = state.scope, onChange = vm::setScope)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SelectChip("Míos", state.scope == Scope.MINE, { vm.setScope(Scope.MINE) })
+                SelectChip("Ambos", state.scope == Scope.BOTH, { vm.setScope(Scope.BOTH) })
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TotalTile("Te deben", state.totals.owedToYou, AppTheme.tokens.success, Modifier.weight(1f))
+                TotalTile("Debes", state.totals.youOwe, AppTheme.tokens.warning, Modifier.weight(1f))
             }
             ErrorText(state.message, Modifier.padding(horizontal = 16.dp))
 
@@ -154,7 +166,8 @@ fun LoansScreen(
     }
 
     if (showNew) {
-        NewLoanDialog(
+        NewLoanForm(
+            initialPerson = newPerson,
             people = state.people,
             errors = state.loanErrors,
             today = today,
@@ -222,6 +235,17 @@ fun LoansScreen(
     }
 }
 
+/** Total de lo que te deben o debes, en recuadro de vidrio con el monto del color de su tipo. */
+@Composable
+internal fun TotalTile(label: String, amount: Double, tint: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    GlassCard(modifier) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
+            Text(formatMxn(amount), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = tint)
+        }
+    }
+}
+
 @Composable
 private fun PersonCard(
     balance: PersonBalance,
@@ -234,9 +258,15 @@ private fun PersonCard(
     onEditRepayment: (LoanView, LoanRepayment) -> Unit,
     onDeleteRepayment: (LoanView, LoanRepayment) -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(balance.label(), style = MaterialTheme.typography.titleMedium)
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(AppTheme.tokens.accent),
+                    contentAlignment = Alignment.Center,
+                ) { Text(balance.person.take(1).uppercase(), color = AppTheme.tokens.onAccent, fontWeight = FontWeight.ExtraBold) }
+                Text(balance.label(), style = MaterialTheme.typography.titleMedium)
+            }
             balance.loans.forEach { view ->
                 val mine = view.loan.ownerId == userId
                 LoanRow(
@@ -339,70 +369,6 @@ private fun MethodChips(method: PaymentMethod, onChange: (PaymentMethod) -> Unit
             label = { Text("Efectivo") },
         )
     }
-}
-
-@Composable
-private fun NewLoanDialog(
-    people: List<String>,
-    errors: Map<LoanField, String>,
-    today: LocalDate,
-    onDismiss: () -> Unit,
-    onEdit: () -> Unit,
-    onSave: (LoanDraft) -> Unit,
-) {
-    var draft by remember { mutableStateOf(LoanDraft()) }
-    // Al volver a escribir se quita el error anterior.
-    LaunchedEffect(draft) { if (errors.isNotEmpty()) onEdit() }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Nuevo préstamo") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = draft.direction == LoanDirection.LENT,
-                        onClick = { draft = draft.copy(direction = LoanDirection.LENT) },
-                        label = { Text("Le presté") },
-                    )
-                    FilterChip(
-                        selected = draft.direction == LoanDirection.BORROWED,
-                        onClick = { draft = draft.copy(direction = LoanDirection.BORROWED) },
-                        label = { Text("Me prestaron") },
-                    )
-                }
-                PayeeField(
-                    value = draft.person,
-                    payees = people,
-                    enabled = true,
-                    onChange = { draft = draft.copy(person = it) },
-                    label = "Persona",
-                    error = errors[LoanField.PERSON],
-                )
-                OutlinedTextField(
-                    value = draft.amountText,
-                    onValueChange = { draft = draft.copy(amountText = it) },
-                    label = { Text("Monto (MXN)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = errors[LoanField.AMOUNT] != null,
-                    supportingText = errors[LoanField.AMOUNT]?.let { { Text(it) } },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                PastDateButton(draft.date, today, onChange = { draft = draft.copy(date = it) })
-                errors[LoanField.DATE]?.let { ErrorText(it) }
-                MethodChips(draft.method) { draft = draft.copy(method = it) }
-                OutlinedTextField(
-                    value = draft.note,
-                    onValueChange = { draft = draft.copy(note = it) },
-                    label = { Text("Nota (opcional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Guardar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-    )
-
 }
 
 /** Registrar un abono nuevo, o editar uno existente ([editing]): monto, fecha, forma de pago y nota. */

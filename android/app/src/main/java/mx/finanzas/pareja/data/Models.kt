@@ -75,6 +75,8 @@ data class Card(
     @SerialName("due_day") val dueDay: Int,
     val color: String? = null,
     val archived: Boolean = false,
+    /** Congelada: no se ofrece al registrar cobros nuevos (sigue visible y se puede pagar). */
+    val frozen: Boolean = false,
     /** Otros últimos 4 con los que aparece la tarjeta (digital, virtual o Google Wallet). */
     @SerialName("alt_last4") val altLast4: List<String> = emptyList(),
     /** Tope de gasto por mes calendario; null si no tiene presupuesto. */

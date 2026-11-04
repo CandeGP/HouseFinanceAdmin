@@ -28,9 +28,31 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import mx.finanzas.pareja.ui.components.GlassCard
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import mx.finanzas.pareja.ui.components.AuthField
+import mx.finanzas.pareja.ui.components.GradientButton
+import mx.finanzas.pareja.ui.AppTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,6 +68,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +111,11 @@ fun CardsScreen(
     val myArchived = state.archived.filter { it.ownerId == userId }
     val hasOwnCard = state.cards.any { it.ownerId == userId }
     var showForm by remember { mutableStateOf(openAddOnStart) }
+    // Tarjeta cuyo detalle está abierto (pantalla completa); null = se ve la lista.
+    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    // La tarjeta al frente de cada pila (mías / de mi pareja); por defecto, la primera.
+    var selectedMine by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTheirs by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var payFor by remember { mutableStateOf<Pair<mx.finanzas.pareja.data.Card, CardCycleStatus>?>(null) }
@@ -131,36 +159,89 @@ fun CardsScreen(
         }
     }
 
+    LaunchedEffect(detailId) { detailId?.let(vm::loadMovements) }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showForm = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Agregar tarjeta")
-            }
-        },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            Text(
-                "Tarjetas",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            ErrorText(state.message, Modifier.padding(horizontal = 16.dp))
-
-            // El estado de cuenta se concilia contra una tarjeta tuya: sin ninguna, el botón no tiene sentido.
-            if (hasOwnCard) {
-                OutlinedButton(
-                    onClick = onImportStatement,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) { Text("Importar estado de cuenta (PDF)") }
+        // Pantalla de detalle de una tarjeta; si se archiva o desaparece, se vuelve a la lista sola.
+        val detailCard = detailId?.let { id -> state.cards.firstOrNull { it.id == id } }
+        if (detailCard != null) {
+            BackHandler { detailId = null }
+            Box(Modifier.padding(padding)) {
+                CardDetailScreen(
+                    card = detailCard,
+                    mine = detailCard.ownerId == userId,
+                    ownerName = memberNames[detailCard.ownerId],
+                    debt = state.appDebts[detailCard.id],
+                    status = state.statuses[detailCard.id],
+                    payments = state.payments[detailCard.id].orEmpty(),
+                    movements = state.movements,
+                    spend = state.spend[detailCard.id],
+                    balanceCheck = state.balanceChecks[detailCard.id],
+                    zone = zone,
+                    onBack = { detailId = null },
+                    onEdit = { budgetFor = detailCard },
+                    onPay = { state.statuses[detailCard.id]?.let { payFor = detailCard to it } },
+                    onEditPayment = { payment -> state.statuses[detailCard.id]?.let { editPayment = Triple(detailCard, it, payment) } },
+                    onDeletePayment = { pendingDeletePayment = it },
+                    onCaptureBalance = { balanceFor = detailCard },
+                    onArchive = { pendingArchive = detailCard },
+                    onToggleFrozen = { vm.setFrozen(detailCard.id, !detailCard.frozen) },
+                )
             }
+            return@Scaffold
+        }
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Tarjetas", style = MaterialTheme.typography.headlineMedium)
+                Surface(
+                    onClick = { showForm = true },
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = AppTheme.tokens.glass,
+                    border = BorderStroke(1.dp, AppTheme.tokens.glassBorder),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Add, contentDescription = "Agregar tarjeta", modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+            ErrorText(state.message, Modifier.padding(horizontal = 20.dp))
 
             // Siempre se muestra la lista: así "Archivadas" es visible aunque no quede ninguna activa.
             run {
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // El estado de cuenta se concilia contra una tarjeta tuya: sin ninguna, el acceso no tiene sentido.
+                    if (hasOwnCard) {
+                        item {
+                            GlassCard(Modifier.fillMaxWidth(), onClick = onImportStatement) {
+                                Row(
+                                    Modifier.padding(horizontal = 16.dp, vertical = 6.dp).heightIn(min = 54.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Icon(Icons.Outlined.UploadFile, contentDescription = null, tint = AppTheme.tokens.chart[3])
+                                    Text("Importar estado de cuenta (PDF)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                    if (state.loading && state.cards.isEmpty()) {
+                        item {
+                            Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
                     if (state.cards.isEmpty() && !state.loading) {
                         item {
                             Text(
@@ -175,6 +256,8 @@ fun CardsScreen(
                     for (isMine in listOf(true, false)) {
                     val group = grouped[isMine].orEmpty()
                     if (group.isEmpty()) continue
+                    val selectedId = if (isMine) selectedMine else selectedTheirs
+                    val current = group.firstOrNull { it.id == selectedId } ?: group.first()
                     item(key = "header-$isMine") {
                         Text(
                             if (isMine) "Mis tarjetas" else "Tarjetas de ${memberNames[group.first().ownerId] ?: "tu pareja"}",
@@ -183,83 +266,27 @@ fun CardsScreen(
                             modifier = Modifier.padding(top = if (isMine) 0.dp else 12.dp),
                         )
                     }
-                    items(group, key = { it.id }) { card ->
-                        val mine = card.ownerId == userId
-                        val spend = state.spend[card.id]
-                        Card(Modifier.fillMaxWidth().let { if (mine) it.clickable { budgetFor = card } else it }) {
-                            Row(
-                                Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        Box(Modifier.size(12.dp).background(Color(cardAccentArgb(card)), CircleShape))
-                                        Text(card.name, style = MaterialTheme.typography.titleMedium)
-                                    }
-                                    Text(
-                                        "${card.bank} •••• ${card.last4}" +
-                                            (if (mine) "" else " · de ${memberNames[card.ownerId] ?: "tu pareja"}") +
-                                            (if (card.hasCashback) " · Cashback" else ""),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    if (card.altLast4.isNotEmpty()) {
-                                        Text(
-                                            "También aparece como: " + card.altLast4.joinToString { "•••• $it" },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    Text(
-                                        "Corte día ${card.cutoffDay} · Pago día ${card.dueDay} · " +
-                                            "Límite ${formatMxn(card.creditLimit)}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                    BudgetLine(card = card, spend = spend, mine = mine)
-                                    BalanceCheckLine(
-                                        appDebt = state.appDebts[card.id],
-                                        check = state.balanceChecks[card.id],
-                                        mine = mine,
-                                        onCapture = { balanceFor = card },
-                                    )
-                                    state.statuses[card.id]?.let { status ->
-                                        PayStatusText(status, Modifier.padding(top = 6.dp))
-                                        state.payments[card.id].orEmpty().forEach { payment ->
-                                            Row(
-                                                Modifier.fillMaxWidth().let {
-                                                    if (mine) it.clickable { editPayment = Triple(card, status, payment) } else it
-                                                },
-                                                verticalAlignment = Alignment.CenterVertically,
-                                            ) {
-                                                Text(
-                                                    "${formatDateEs(localDate(payment.paidAt, zone))} · " +
-                                                        "${if (payment.method == PaymentMethod.CASH) "Efectivo" else "Transferencia"}" +
-                                                        " · ${formatMxn(payment.amount)}" +
-                                                        if (mine) " · toca para editar" else "",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                                if (mine) {
-                                                    TextButton(onClick = { pendingDeletePayment = payment }) { Text("Borrar") }
-                                                }
-                                            }
-                                        }
-                                        if (mine) {
-                                            TextButton(onClick = { payFor = card to status }) { Text("Registrar pago") }
-                                        }
-                                    }
-                                }
-                                if (mine) {
-                                    IconButton(onClick = { pendingArchive = card }) {
-                                        Icon(Icons.Filled.Archive, contentDescription = "Archivar tarjeta")
-                                    }
-                                }
-                            }
-                        }
+                    item(key = "stack-$isMine") {
+                        WalletStack(
+                            cards = group,
+                            selectedId = current.id,
+                            onSelect = { if (isMine) selectedMine = it else selectedTheirs = it },
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                    // Resumen de la tarjeta al frente; el detalle completo (pagos, presupuesto, conciliación) va en su pantalla.
+                    item(key = "panel-$isMine") {
+                        val card = current
+                        CardSummaryPanel(
+                            card = card,
+                            debt = state.appDebts[card.id],
+                            today = today,
+                            mine = card.ownerId == userId,
+                            canPay = state.statuses[card.id] != null,
+                            onPay = { state.statuses[card.id]?.let { payFor = card to it } },
+                            onDetail = { detailId = card.id },
+                            onEdit = { budgetFor = card },
+                        )
                     }
                     }
                     run {
@@ -281,7 +308,7 @@ fun CardsScreen(
                             }
                         }
                         items(myArchived, key = { "archived-${it.id}" }) { card ->
-                            Card(Modifier.fillMaxWidth()) {
+                            GlassCard(Modifier.fillMaxWidth()) {
                                 Row(
                                     Modifier.padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -401,11 +428,11 @@ fun CardsScreen(
 
 /** Progreso del gasto del mes frente al presupuesto, o la invitación a fijar uno (solo tu tarjeta). */
 @Composable
-private fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, mine: Boolean) {
+internal fun BudgetLine(card: mx.finanzas.pareja.data.Card, spend: MonthSpend?, mine: Boolean) {
     val budget = card.monthlyBudget
     when {
         budget == null && mine -> Text(
-            "Toca la tarjeta para editarla o fijar un presupuesto mensual",
+            "Toca Editar para fijar un presupuesto mensual",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -598,6 +625,7 @@ private fun CardEditDialog(
     )
 }
 
+/** Alta de tarjeta a pantalla completa: vista previa en vivo, datos de la tarjeta y su color. */
 @Composable
 private fun CardFormDialog(
     errors: Map<CardField, String>,
@@ -605,44 +633,71 @@ private fun CardFormDialog(
     onSave: (CardDraft) -> Unit,
 ) {
     var draft by remember { mutableStateOf(CardDraft()) }
-
-    @Composable
-    fun field(
-        label: String,
-        value: String,
-        field: CardField,
-        keyboard: KeyboardType = KeyboardType.Text,
-        onChange: (String) -> Unit,
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onChange,
-            label = { Text(label) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-            isError = errors[field] != null,
-            supportingText = errors[field]?.let { { Text(it) } },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Nueva tarjeta") },
-        text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                field("Nombre (ej. Nu azul)", draft.name, CardField.NAME) { draft = draft.copy(name = it) }
-                field("Banco", draft.bank, CardField.BANK) { draft = draft.copy(bank = it) }
-                field("Últimos 4 dígitos", draft.last4, CardField.LAST4, KeyboardType.Number) { draft = draft.copy(last4 = it.take(4)) }
-                field("Límite de crédito", draft.limitText, CardField.LIMIT, KeyboardType.Decimal) { draft = draft.copy(limitText = it) }
-                field("Día de corte (1-31)", draft.cutoffText, CardField.CUTOFF, KeyboardType.Number) { draft = draft.copy(cutoffText = it) }
-                field("Día de pago (1-31)", draft.dueText, CardField.DUE, KeyboardType.Number) { draft = draft.copy(dueText = it) }
-            }
-        },
-        confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Guardar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    val previewCard = mx.finanzas.pareja.data.Card(
+        id = "preview", householdId = "", ownerId = "",
+        name = draft.name.ifBlank { "Mi tarjeta" },
+        bank = draft.bank.ifBlank { "Banco" },
+        last4 = draft.last4.padEnd(4, '0'),
+        creditLimit = 0.0, cutoffDay = 1, dueDay = 1,
+        color = draft.color,
     )
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(Modifier.fillMaxSize().background(AppTheme.tokens.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().height(48.dp)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text("Cancelar") }
+                    Text("Nueva tarjeta", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center))
+                }
+                CardFace(previewCard, front = true, onClick = null, modifier = Modifier.fillMaxWidth().height(170.dp))
+                AuthField("Apodo", draft.name, { draft = draft.copy(name = it) }, placeholder = "Ej. BBVA Azul", error = errors[CardField.NAME])
+                AuthField("Banco", draft.bank, { draft = draft.copy(bank = it) }, placeholder = "Ej. BBVA", error = errors[CardField.BANK])
+                AuthField(
+                    "Últimos 4 dígitos", draft.last4, { draft = draft.copy(last4 = it.filter(Char::isDigit).take(4)) },
+                    placeholder = "1234", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), error = errors[CardField.LAST4],
+                )
+                Text("Solo guardamos el apodo y los últimos 4 dígitos. Nunca el número completo.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f))
+                AuthField(
+                    "Límite de crédito", draft.limitText, { draft = draft.copy(limitText = it) },
+                    placeholder = "30000", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), error = errors[CardField.LIMIT],
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AuthField(
+                        "Día de corte", draft.cutoffText, { draft = draft.copy(cutoffText = it.filter(Char::isDigit).take(2)) },
+                        modifier = Modifier.weight(1f), placeholder = "1-31",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), error = errors[CardField.CUTOFF],
+                    )
+                    AuthField(
+                        "Día de pago", draft.dueText, { draft = draft.copy(dueText = it.filter(Char::isDigit).take(2)) },
+                        modifier = Modifier.weight(1f), placeholder = "1-31",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), error = errors[CardField.DUE],
+                    )
+                }
+                Text("COLOR", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val choices = listOf<String?>(null) + CARD_COLOR_CHOICES
+                    choices.forEach { hex ->
+                        val selected = draft.color == hex
+                        Box(
+                            Modifier.size(36.dp).clip(CircleShape)
+                                .background(if (hex == null) AppTheme.tokens.glass else Color(android.graphics.Color.parseColor(hex)))
+                                .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else AppTheme.tokens.glassBorder, CircleShape)
+                                .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.RadioButton) { draft = draft.copy(color = hex) },
+                            contentAlignment = Alignment.Center,
+                        ) { if (hex == null) Text("A", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+            GradientButton(
+                onClick = { onSave(draft) },
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            ) { Text("Guardar tarjeta") }
+        }
+    }
 }

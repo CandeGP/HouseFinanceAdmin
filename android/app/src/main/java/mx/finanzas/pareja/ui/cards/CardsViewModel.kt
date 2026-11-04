@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import mx.finanzas.pareja.data.Card
 import mx.finanzas.pareja.data.CardCycleStatus
@@ -21,6 +23,7 @@ import mx.finanzas.pareja.data.FinanceRepository
 import mx.finanzas.pareja.data.MonthSpend
 import mx.finanzas.pareja.data.NewCard
 import mx.finanzas.pareja.data.NewCardPayment
+import mx.finanzas.pareja.data.Transaction
 import mx.finanzas.pareja.data.CardBalanceCheck
 import mx.finanzas.pareja.data.NewCardBalanceCheck
 import mx.finanzas.pareja.data.userMessage
@@ -59,6 +62,8 @@ data class CardsUiState(
     val balanceChecks: Map<String, CardBalanceCheck> = emptyMap(),
     val balanceError: String? = null,
     val balanceSaved: Boolean = false,
+    /** Movimientos recientes de la tarjeta cuyo detalle está abierto, del más nuevo al más viejo. */
+    val movements: List<Transaction> = emptyList(),
 )
 
 private val DEFAULT_ZONE = TimeZone.of("America/Mexico_City")
@@ -116,6 +121,7 @@ class CardsViewModel(
                         NewCard(
                             householdId = householdId, ownerId = userId, name = v.name, bank = v.bank,
                             last4 = v.last4, creditLimit = v.creditLimit, cutoffDay = v.cutoffDay, dueDay = v.dueDay,
+                            color = v.color,
                         ),
                     )
                     _state.update { it.copy(errors = emptyMap(), added = true) }
@@ -125,6 +131,19 @@ class CardsViewModel(
                 } catch (e: Exception) {
                     _state.update { it.copy(message = userMessage(e)) }
                 }
+            }
+        }
+    }
+
+    fun setFrozen(id: String, frozen: Boolean) {
+        viewModelScope.launch {
+            try {
+                repo.setCardFrozen(id, frozen)
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = userMessage(e)) }
             }
         }
     }
@@ -291,6 +310,16 @@ class CardsViewModel(
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(message = userMessage(e)) }
+            }
+        }
+    }
+
+    /** Trae los movimientos de los últimos dos meses de una tarjeta para su pantalla de detalle. */
+    fun loadMovements(cardId: String) {
+        viewModelScope.launch {
+            val items = runCatching { repo.transactions(today.minus(2, DateTimeUnit.MONTH), today) }.getOrDefault(emptyList())
+            _state.update { state ->
+                state.copy(movements = items.filter { it.cardId == cardId }.sortedByDescending { it.occurredAt })
             }
         }
     }
