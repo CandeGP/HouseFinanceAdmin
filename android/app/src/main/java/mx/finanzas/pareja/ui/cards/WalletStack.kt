@@ -113,7 +113,7 @@ internal fun CardFace(card: Card, front: Boolean, onClick: (() -> Unit)?, modifi
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    if (front) if (card.frozen) "Congelada" else "Crédito" else "•••• ${card.last4}",
+                    if (front) if (card.frozen) "Congelada" else if (card.isDebit) "Débito" else "Crédito" else "•••• ${card.last4}",
                     color = ink,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -134,8 +134,9 @@ internal fun CardFace(card: Card, front: Boolean, onClick: (() -> Unit)?, modifi
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
                     )
+                    // La marca (VISA, Mastercard, AMEX) va en lugar del banco cuando se eligió.
                     Text(
-                        card.bank,
+                        card.brand?.let { if (it == "amex") "AMEX" else if (it == "visa") "VISA" else "Mastercard" } ?: card.bank,
                         color = ink,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold,

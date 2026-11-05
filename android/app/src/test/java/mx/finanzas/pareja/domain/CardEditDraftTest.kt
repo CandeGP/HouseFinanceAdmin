@@ -15,6 +15,30 @@ class CardEditDraftTest {
     private fun invalid(d: CardEditDraft) = (d.validate() as CardEditResult.Invalid).errors
 
     @Test
+    fun `debito no pide limite, corte ni pago y guarda valores neutros`() {
+        val v = valid(CardEditDraft(CardDraft(name = "Nómina", bank = "BBVA", last4 = "1111", kind = "debit"))).card
+        assertEquals("debit", v.kind)
+        assertEquals(0.0, v.creditLimit, 0.0)
+        assertEquals(1, v.cutoffDay)
+        assertEquals(1, v.dueDay)
+    }
+
+    @Test
+    fun `credito si exige limite, corte y pago`() {
+        val errors = invalid(CardEditDraft(CardDraft(name = "BBVA Azul", bank = "BBVA", last4 = "5436")))
+        assertNotNull(errors[CardField.LIMIT])
+        assertNotNull(errors[CardField.CUTOFF])
+        assertNotNull(errors[CardField.DUE])
+    }
+
+    @Test
+    fun `solo se guardan las marcas visa, mastercard y amex y un tipo raro cae a credito`() {
+        assertEquals("amex", valid(CardEditDraft(base.copy(brand = "amex"))).card.brand)
+        assertNull(valid(CardEditDraft(base.copy(brand = "diners"))).card.brand)
+        assertEquals("credit", valid(CardEditDraft(base.copy(kind = "efectivo"))).card.kind)
+    }
+
+    @Test
     fun `el cashback se conserva al validar y por defecto esta apagado`() {
         assertEquals(true, valid(CardEditDraft(base, hasCashback = true)).hasCashback)
         assertEquals(false, valid(CardEditDraft(base)).hasCashback)

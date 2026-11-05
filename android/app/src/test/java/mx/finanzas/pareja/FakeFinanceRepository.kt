@@ -166,7 +166,7 @@ class FakeFinanceRepository : FinanceRepository {
             if (it.id != id) it else it.copy(
                 name = patch.name, bank = patch.bank, last4 = patch.last4, creditLimit = patch.creditLimit,
                 cutoffDay = patch.cutoffDay, dueDay = patch.dueDay, monthlyBudget = patch.monthlyBudget,
-                color = patch.color,
+                color = patch.color, kind = patch.kind, brand = patch.brand, hasCashback = patch.hasCashback,
             )
         }
     }

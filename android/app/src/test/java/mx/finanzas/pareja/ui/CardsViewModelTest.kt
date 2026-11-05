@@ -48,6 +48,59 @@ class CardsViewModelTest {
     }
 
     @Test
+    fun `agregar guarda tipo, marca, presupuesto y cashback`() {
+        val vm = vm()
+        vm.addCard(
+            CardEditDraft(
+                card = CardDraft(
+                    name = "Amex Gold", bank = "Amex", last4 = "1005",
+                    limitText = "50000", cutoffText = "3", dueText = "23", brand = "amex",
+                ),
+                budgetText = "1500",
+                hasCashback = true,
+            ),
+        )
+
+        val added = repo.addedCards.single()
+        assertEquals("amex", added.brand)
+        assertEquals("credit", added.kind)
+        assertEquals(1500.0, added.monthlyBudget!!, 0.0)
+        assertEquals(true, added.hasCashback)
+        assertEquals(true, vm.state.value.added)
+    }
+
+    @Test
+    fun `editar de debito a credito con la marca quitada envia tipo y marca en el parche`() {
+        repo.cardList = listOf(card("activa").copy(kind = "debit", brand = "visa"))
+        val vm = vm()
+        vm.saveEdit(
+            "activa",
+            CardEditDraft(
+                CardDraft(
+                    name = "Plata", bank = "Plata", last4 = "0931",
+                    limitText = "20000", cutoffText = "10", dueText = "5", kind = "credit", brand = null,
+                ),
+            ),
+        )
+
+        // El parche lleva siempre tipo y marca (sin valores por defecto), así el servidor sí los actualiza.
+        val patch = repo.editedCards.single().second
+        assertEquals("credit", patch.kind)
+        assertEquals(null, patch.brand)
+        assertEquals(false, patch.hasCashback)
+        assertEquals("credit", vm.state.value.cards.single().kind)
+    }
+
+    @Test
+    fun `agregar una debito no pide limite y no llega invalida`() {
+        val vm = vm()
+        vm.addCard(CardEditDraft(CardDraft(name = "Nómina", bank = "BBVA", last4 = "1111", kind = "debit")))
+
+        assertEquals("debit", repo.addedCards.single().kind)
+        assertEquals(emptyMap<CardField, String>(), vm.state.value.errors)
+    }
+
+    @Test
     fun `editar guarda corte, pago, limite, presupuesto y color`() {
         val vm = vm()
         vm.saveEdit(

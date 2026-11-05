@@ -30,7 +30,10 @@ data class CardEditPatch(
     @SerialName("due_day") val dueDay: Int,
     @SerialName("monthly_budget") val monthlyBudget: Double?,
     val color: String?,
-    @SerialName("has_cashback") val hasCashback: Boolean = false,
+    // Sin valores por defecto a propósito: así siempre se envían y cambiar a crédito, quitar la marca o apagar el cashback sí se guarda.
+    @SerialName("has_cashback") val hasCashback: Boolean,
+    val kind: String,
+    val brand: String?,
 )
 
 /**

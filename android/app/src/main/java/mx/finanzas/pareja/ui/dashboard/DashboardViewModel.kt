@@ -84,7 +84,8 @@ class DashboardViewModel(
             _state.update { it.copy(loading = true, error = null) }
             try {
                 val ref = today()
-                val cards = repo.cards().filterNot { it.archived }
+                // Débito no tiene ciclo ni saldo por pagar: no entra al ranking ni a los pagos próximos.
+                val cards = repo.cards().filterNot { it.archived || it.isDebit }
                 // Una sola consulta para todas las tarjetas (estimación del ciclo y estado de pago).
                 val snapshots = repo.cardSnapshots(cards.map { it.id }, ref).associateBy { it.cardId }
                 allViews = cards.mapNotNull { card -> snapshots[card.id]?.estimate?.let { CardCycleView(card, it) } }

@@ -9,6 +9,8 @@ data class RawNotification(
     val title: String?,
     val text: String?,
     val postTime: Instant,
+    /** Nombre visible de la app emisora; ayuda a saber de qué banco viene el aviso. */
+    val appLabel: String? = null,
 )
 
 /** Cobro detectado en una notificación. `cardLast4` es null si la fuente no lo informa. */
@@ -20,9 +22,31 @@ data class ParsedCharge(
     val sourcePackage: String,
     val capturedAt: Instant,
     val raw: String,
+    /** Banco del aviso (llave de [ChargeSources.bankOf]); sirve para ligarlo a tu tarjeta de ese banco. */
+    val bank: String? = null,
 )
 
 object ChargeSources {
+    /** Bancos y fintech de México: llave y cómo se escribe su nombre (en el paquete, la app, el aviso o la tarjeta). */
+    private val BANKS: Map<String, Regex> = listOf(
+        "plata" to """\bplata\b""", "nu" to """\bnu\b|nubank""", "bbva" to """bbva|bancomer""",
+        "santander" to """santander""", "banorte" to """banorte""", "hsbc" to """hsbc""",
+        "banamex" to """banamex|citibanamex|\bciti\b""", "scotiabank" to """scotia""",
+        "inbursa" to """inbursa""", "azteca" to """azteca""", "afirme" to """afirme""", "bajio" to """baj[ií]o""",
+        "rappi" to """rappi""", "mercadopago" to """mercado\s*pago|\bmercado\b""", "liverpool" to """liverpool""", "didi" to """\bdidi\b""", "klar" to """\bklar\b""",
+        "stori" to """\bstori\b""", "revolut" to """revolut""", "openbank" to """openbank""",
+        "heybanco" to """hey\s*banco""", "spin" to """\bspin\b""", "uala" to """ual[aá]""",
+        "fondeadora" to """fondeadora""", "amex" to """amex|american\s*express""",
+    ).associate { (key, pattern) -> key to Regex(pattern, RegexOption.IGNORE_CASE) }
+
+    /** Banco al que apunta el primer texto que lo nombra (paquete, app, aviso…); null si ninguno. */
+    fun bankOf(vararg hints: String?): String? =
+        hints.filterNotNull().firstNotNullOfOrNull { hint -> BANKS.entries.firstOrNull { it.value.containsMatchIn(hint) }?.key }
+
+    /** ¿Esta tarjeta (por su banco o nombre) es de ese banco? */
+    fun cardIsOfBank(bank: String, cardBank: String, cardName: String): Boolean =
+        BANKS[bank]?.let { it.containsMatchIn(cardBank) || it.containsMatchIn(cardName) } ?: false
+
     const val GOOGLE_WALLET = "com.google.android.apps.walletnfcrel"
     const val PLATA = "dif.tech.plata"
     const val GMAIL = "com.google.android.gm"
@@ -42,7 +66,7 @@ object ChargeSources {
     private val BANK_LABEL = Regex(
         """banco|bank|bbva|banorte|santander|hsbc|banamex|citi|scotia|inbursa|azteca|afirme|bajio|""" +
             """\bnu\b|nubank|rappi|\bplata\b|mercado\s*pago|\bklar\b|\bstori\b|revolut|openbank|hey\s*banco|""" +
-            """\bspin\b|ual[aá]|fondeadora|amex|american\s*express|billetera|wallet|google\s*pay""",
+            """\bspin\b|ual[aá]|fondeadora|amex|american\s*express|billetera|wallet|google\s*pay|liverpool|\bdidi\b""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -79,7 +103,14 @@ fun parseCharge(n: RawNotification): ParsedCharge? {
         ChargeSources.PLATA -> parsePlata(n)
         else -> null
     }
-    return strict ?: parseBankText(n)
+    val charge = strict ?: parseBankText(n) ?: return null
+    // Billetera nombra el banco en el texto ("con Rappicard ••8476") y Gmail en el remitente; las apps, en su paquete/nombre.
+    val bank = when (n.packageName) {
+        ChargeSources.GOOGLE_WALLET -> ChargeSources.bankOf(n.text)
+        ChargeSources.GMAIL -> ChargeSources.bankOf(n.title)
+        else -> ChargeSources.bankOf(n.packageName, n.appLabel)
+    }
+    return charge.copy(bank = bank)
 }
 
 // Un cobro lleva uno de estos verbos/sustantivos; un abono, depósito o promoción no.
@@ -145,6 +176,37 @@ private fun parseWallet(n: RawNotification): ParsedCharge? {
         merchant = merchant, amount = amount, cardLast4 = match.groupValues[2],
         sourcePackage = n.packageName, capturedAt = n.postTime, raw = "$merchant | $text",
     )
+}
+
+/**
+ * Muchos avisos no traen los últimos 4 (Plata) o traen los de una tarjeta virtual/digital (Nu, Billetera)
+ * que no coinciden con la tarjeta registrada. Si se conoce el banco del aviso y tú tienes una sola tarjeta
+ * activa de ese banco, se usa esa; con varias no se adivina. Si los dígitos ya son de alguna tarjeta tuya
+ * (o un alias aprendido), no se toca: lo resuelve el servidor.
+ */
+fun inferCardLast4(charge: ParsedCharge, cards: List<mx.finanzas.pareja.data.Card>, userId: String): String? {
+    val bank = charge.bank ?: return null
+    val own = cards.filter { it.ownerId == userId && !it.archived }
+    val digits = charge.cardLast4
+    if (digits != null && own.any { it.last4 == digits || digits in it.altLast4 }) return null
+    return soleOwnCardOfBank(own, bank)?.last4
+}
+
+/** Solo cuentan las tarjetas de quien recibe el aviso: en un hogar con varias personas no se mezclan. */
+fun soleOwnCardOfBank(cards: List<mx.finanzas.pareja.data.Card>, userId: String, bank: String): mx.finanzas.pareja.data.Card? =
+    soleOwnCardOfBank(cards.filter { it.ownerId == userId && !it.archived }, bank)
+
+private fun soleOwnCardOfBank(own: List<mx.finanzas.pareja.data.Card>, bank: String): mx.finanzas.pareja.data.Card? =
+    own.filter { ChargeSources.cardIsOfBank(bank, it.bank, it.name) }.singleOrNull()
+
+// El aviso de la app de Plata se guarda como "Comercio | $298" (el de Billetera trae además "con …").
+private val PLATA_RAW = Regex("""\|\s*\$\s*[\d,]+(?:\.\d{1,2})?$""")
+
+/** Banco de un cobro ya guardado, por su texto original ("comercio | …"); null si no se reconoce. */
+fun bankOfRaw(raw: String?): String? = when {
+    raw == null -> null
+    PLATA_RAW.containsMatchIn(raw.trim()) -> "plata"
+    else -> ChargeSources.bankOf(raw)
 }
 
 private fun parsePlata(n: RawNotification): ParsedCharge? {

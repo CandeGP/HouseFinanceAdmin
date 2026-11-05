@@ -1,5 +1,8 @@
 package mx.finanzas.pareja.domain
 
+import mx.finanzas.pareja.data.CARD_KIND_CREDIT
+import mx.finanzas.pareja.data.CARD_KIND_DEBIT
+
 enum class CardField { NAME, BANK, LAST4, LIMIT, CUTOFF, DUE, BUDGET, COLOR }
 
 data class ValidCard(
@@ -11,6 +14,8 @@ data class ValidCard(
     val dueDay: Int,
     /** Color elegido para la tarjeta; null deja el de su banco. */
     val color: String? = null,
+    val kind: String = CARD_KIND_CREDIT,
+    val brand: String? = null,
 )
 
 sealed interface CardDraftResult {
@@ -75,21 +80,25 @@ data class CardDraft(
     val cutoffText: String = "",
     val dueText: String = "",
     val color: String? = null,
+    val kind: String = CARD_KIND_CREDIT,
+    val brand: String? = null,
 ) {
     fun validate(): CardDraftResult {
         val errors = linkedMapOf<CardField, String>()
+        val debit = kind == CARD_KIND_DEBIT
 
         if (name.isBlank()) errors[CardField.NAME] = "Ponle un nombre a la tarjeta"
         if (bank.isBlank()) errors[CardField.BANK] = "Escribe el banco"
         if (!LAST4.matches(last4.trim())) errors[CardField.LAST4] = "Deben ser 4 dígitos"
 
-        val limit = parseAmount(limitText)
+        // Débito no tiene límite, corte ni pago: no se piden y se guardan valores neutros.
+        val limit = if (debit) DEBIT_LIMIT else parseAmount(limitText)
         if (limit == null) errors[CardField.LIMIT] = "Límite de crédito inválido"
 
-        val cutoff = cutoffText.trim().toIntOrNull()
+        val cutoff = if (debit) DEBIT_DAY else cutoffText.trim().toIntOrNull()
         if (cutoff == null || cutoff !in 1..31) errors[CardField.CUTOFF] = "Día entre 1 y 31"
 
-        val due = dueText.trim().toIntOrNull()
+        val due = if (debit) DEBIT_DAY else dueText.trim().toIntOrNull()
         if (due == null || due !in 1..31) errors[CardField.DUE] = "Día entre 1 y 31"
 
         if (errors.isNotEmpty()) return CardDraftResult.Invalid(errors)
@@ -103,7 +112,15 @@ data class CardDraft(
                 cutoffDay = requireNotNull(cutoff),
                 dueDay = requireNotNull(due),
                 color = color?.trim()?.takeIf { HEX_COLOR.matches(it) }?.uppercase(),
+                kind = if (debit) CARD_KIND_DEBIT else CARD_KIND_CREDIT,
+                brand = brand?.takeIf { it in CARD_BRANDS },
             ),
         )
     }
 }
+
+/** Marcas que se pueden elegir; es lo que acepta la base. */
+val CARD_BRANDS: List<String> = listOf("visa", "mastercard", "amex")
+
+private const val DEBIT_LIMIT = 0.0
+private const val DEBIT_DAY = 1

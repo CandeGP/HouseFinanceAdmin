@@ -24,6 +24,7 @@ import mx.finanzas.pareja.domain.NewCharge
 import mx.finanzas.pareja.domain.ParsedCharge
 import mx.finanzas.pareja.domain.RawNotification
 import mx.finanzas.pareja.domain.chargeAlertsFor
+import mx.finanzas.pareja.domain.inferCardLast4
 import mx.finanzas.pareja.domain.parseCharge
 
 /**
@@ -45,7 +46,7 @@ class CaptureService : NotificationListenerService() {
         val app = application as FinanzasApp
 
         val charge = parseCharge(
-            RawNotification(sbn.packageName, title, text, Instant.fromEpochMilliseconds(sbn.postTime)),
+            RawNotification(sbn.packageName, title, text, Instant.fromEpochMilliseconds(sbn.postTime), appLabel(extras)),
         )
         if (charge == null) {
             // Con monto pero sin reconocer: se guarda solo en el teléfono para afinar parsers.
@@ -81,13 +82,14 @@ object CaptureSync {
             ?.firstOrNull { it.userId == userId }?.householdId ?: return
 
         val ingested = mutableListOf<Pair<ParsedCharge, IngestResult>>()
+        val cards = runCatching { repo.cards() }.getOrDefault(emptyList())
         app.captureStore.drain { charge ->
             val result = repo.ingestCapture(
                 householdId = householdId,
                 merchant = charge.merchant,
                 amount = charge.amount,
                 capturedAt = charge.capturedAt,
-                cardLast4 = charge.cardLast4,
+                cardLast4 = charge.cardLast4 ?: inferCardLast4(charge, cards, userId),
                 source = if (charge.sourcePackage == ChargeSources.GMAIL) TxSource.EMAIL else TxSource.NOTIFICATION,
                 raw = charge.raw,
             )

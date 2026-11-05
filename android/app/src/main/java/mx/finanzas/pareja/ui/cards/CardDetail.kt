@@ -96,27 +96,37 @@ internal fun CardSummaryPanel(
     val days = daysUntilCut(today, card.cutoffDay)
     GlassCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Saldo actual", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
+            if (card.isDebit) {
+                // Débito no tiene saldo por pagar, corte ni límite.
+                Text("Tarjeta de débito", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    when (days) {
-                        0 -> "Corte hoy"
-                        1 -> "Corte mañana"
-                        else -> "Corte en $days días"
-                    },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AppTheme.tokens.warning,
-                    modifier = Modifier.clip(CircleShape)
-                        .background(AppTheme.tokens.warning.copy(alpha = 0.18f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    "No tiene corte, pago ni límite. Sus compras aparecen en Detalle.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
-            }
-            Amount(owed, wholeSp = 28, centsSp = 17, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
-            UsageBar(fraction, height = 8.dp)
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${"%.0f".format(fraction * 100)}% de tu límite", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-                Text("Límite ${formatMxn(card.creditLimit)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Saldo actual", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
+                    Text(
+                        when (days) {
+                            0 -> "Corte hoy"
+                            1 -> "Corte mañana"
+                            else -> "Corte en $days días"
+                        },
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppTheme.tokens.warning,
+                        modifier = Modifier.clip(CircleShape)
+                            .background(AppTheme.tokens.warning.copy(alpha = 0.18f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+                Amount(owed, wholeSp = 28, centsSp = 17, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                UsageBar(fraction, height = 8.dp)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("${"%.0f".format(fraction * 100)}% de tu límite", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    Text("Límite ${formatMxn(card.creditLimit)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                }
             }
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (mine && canPay) PanelButton("Pagar", primary = true, onClick = onPay, modifier = Modifier.weight(1f))
@@ -217,7 +227,7 @@ internal fun CardDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { CardFace(card, front = true, onClick = null, modifier = Modifier.fillMaxWidth().height(168.dp)) }
-            item {
+            if (!card.isDebit) item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     GlassCard(Modifier.weight(1f)) {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -237,8 +247,10 @@ internal fun CardDetailScreen(
             }
             item {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoChip("Corte día ${card.cutoffDay}", null)
-                    InfoChip("Pago día ${card.dueDay}", tokens.warning)
+                    if (!card.isDebit) {
+                        InfoChip("Corte día ${card.cutoffDay}", null)
+                        InfoChip("Pago día ${card.dueDay}", tokens.warning)
+                    }
                     if (card.hasCashback) InfoChip("Cashback", tokens.success)
                     if (!mine) InfoChip("de ${ownerName ?: "tu pareja"}", null)
                 }

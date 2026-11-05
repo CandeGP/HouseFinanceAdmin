@@ -83,7 +83,16 @@ data class Card(
     @SerialName("monthly_budget") val monthlyBudget: Double? = null,
     /** La tarjeta da cashback o bonificaciones. */
     @SerialName("has_cashback") val hasCashback: Boolean = false,
-)
+    /** `credit` o `debit`. Débito no tiene límite, corte ni pago. */
+    val kind: String = CARD_KIND_CREDIT,
+    /** `visa`, `mastercard` o `amex`; null si no se indicó. */
+    val brand: String? = null,
+) {
+    val isDebit: Boolean get() = kind == CARD_KIND_DEBIT
+}
+
+const val CARD_KIND_CREDIT = "credit"
+const val CARD_KIND_DEBIT = "debit"
 
 /** Resultado de la RPC `card_month_spend`: gasto del mes de una tarjeta frente a su presupuesto. */
 @Serializable
@@ -106,6 +115,10 @@ data class NewCard(
     @SerialName("cutoff_day") val cutoffDay: Int,
     @SerialName("due_day") val dueDay: Int,
     val color: String? = null,
+    val kind: String = CARD_KIND_CREDIT,
+    val brand: String? = null,
+    @SerialName("monthly_budget") val monthlyBudget: Double? = null,
+    @SerialName("has_cashback") val hasCashback: Boolean = false,
 )
 
 /** Resultado de la RPC `card_cycle_estimate`. */
@@ -138,6 +151,8 @@ data class Transaction(
     val notes: String? = null,
     val source: TxSource = TxSource.MANUAL,
     val status: TxStatus = TxStatus.CONFIRMED,
+    /** Texto original de la notificación capturada ("comercio | monto"); null en cobros manuales. */
+    @SerialName("capture_raw") val captureRaw: String? = null,
 )
 
 @Serializable

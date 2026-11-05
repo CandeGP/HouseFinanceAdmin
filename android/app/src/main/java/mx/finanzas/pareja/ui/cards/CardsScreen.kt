@@ -114,9 +114,8 @@ fun CardsScreen(
     var showForm by remember { mutableStateOf(openAddOnStart) }
     // Tarjeta cuyo detalle está abierto (pantalla completa); null = se ve la lista.
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
-    // La tarjeta al frente de cada pila (mías / de mi pareja); por defecto, la primera.
+    // La tarjeta al frente de la pila; por defecto, la primera.
     var selectedMine by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedTheirs by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingArchive by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var budgetFor by remember { mutableStateOf<mx.finanzas.pareja.data.Card?>(null) }
     var payFor by remember { mutableStateOf<Pair<mx.finanzas.pareja.data.Card, CardCycleStatus>?>(null) }
@@ -200,15 +199,34 @@ fun CardsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Tarjetas", style = MaterialTheme.typography.headlineMedium)
-                Surface(
-                    onClick = { showForm = true },
-                    modifier = Modifier.size(44.dp),
-                    shape = CircleShape,
-                    color = AppTheme.tokens.glass,
-                    border = BorderStroke(1.dp, AppTheme.tokens.glassBorder),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Add, contentDescription = "Agregar tarjeta", modifier = Modifier.size(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // El estado de cuenta se concilia contra una tarjeta tuya: sin ninguna, el acceso no tiene sentido.
+                    if (hasOwnCard) {
+                        Surface(
+                            onClick = onImportStatement,
+                            modifier = Modifier.size(44.dp),
+                            shape = CircleShape,
+                            color = AppTheme.tokens.glass,
+                            border = BorderStroke(1.dp, AppTheme.tokens.glassBorder),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Outlined.UploadFile, contentDescription = "Importar estado de cuenta (PDF)",
+                                    tint = AppTheme.tokens.chart[3], modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                    Surface(
+                        onClick = { showForm = true },
+                        modifier = Modifier.size(44.dp),
+                        shape = CircleShape,
+                        color = AppTheme.tokens.glass,
+                        border = BorderStroke(1.dp, AppTheme.tokens.glassBorder),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Add, contentDescription = "Agregar tarjeta", modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             }
@@ -220,22 +238,6 @@ fun CardsScreen(
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp + LocalDockInset.current),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    // El estado de cuenta se concilia contra una tarjeta tuya: sin ninguna, el acceso no tiene sentido.
-                    if (hasOwnCard) {
-                        item {
-                            GlassCard(Modifier.fillMaxWidth(), onClick = onImportStatement) {
-                                Row(
-                                    Modifier.padding(horizontal = 16.dp, vertical = 6.dp).heightIn(min = 54.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    Icon(Icons.Outlined.UploadFile, contentDescription = null, tint = AppTheme.tokens.chart[3])
-                                    Text("Importar estado de cuenta (PDF)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-                    }
                     if (state.loading && state.cards.isEmpty()) {
                         item {
                             Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
@@ -252,26 +254,23 @@ fun CardsScreen(
                             )
                         }
                     }
-                    // Mis tarjetas primero y las de la pareja aparte (solo lectura).
-                    val grouped = state.cards.groupBy { it.ownerId == userId }
-                    for (isMine in listOf(true, false)) {
-                    val group = grouped[isMine].orEmpty()
+                    // Solo tus tarjetas: las de tu pareja no se muestran aquí.
+                    for (isMine in listOf(true)) {
+                    val group = state.cards.filter { it.ownerId == userId }
                     if (group.isEmpty()) continue
-                    val selectedId = if (isMine) selectedMine else selectedTheirs
-                    val current = group.firstOrNull { it.id == selectedId } ?: group.first()
+                    val current = group.firstOrNull { it.id == selectedMine } ?: group.first()
                     item(key = "header-$isMine") {
                         Text(
-                            if (isMine) "Mis tarjetas" else "Tarjetas de ${memberNames[group.first().ownerId] ?: "tu pareja"}",
+                            "Mis tarjetas",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = if (isMine) 0.dp else 12.dp),
                         )
                     }
                     item(key = "stack-$isMine") {
                         WalletStack(
                             cards = group,
                             selectedId = current.id,
-                            onSelect = { if (isMine) selectedMine = it else selectedTheirs = it },
+                            onSelect = { selectedMine = it },
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
@@ -335,11 +334,12 @@ fun CardsScreen(
     }
 
     budgetFor?.let { card ->
-        CardEditDialog(
-            card = card,
+        CardForm(
+            initial = card,
             errors = state.editErrors,
             onDismiss = { budgetFor = null; vm.consumeEdited() },
             onSave = { draft -> vm.saveEdit(card.id, draft) },
+            onArchive = { budgetFor = null; vm.consumeEdited(); pendingArchive = card },
         )
     }
 
@@ -419,7 +419,8 @@ fun CardsScreen(
     }
 
     if (showForm) {
-        CardFormDialog(
+        CardForm(
+            initial = null,
             errors = state.errors,
             onDismiss = { showForm = false },
             onSave = vm::addCard,
@@ -566,171 +567,4 @@ private fun CardPaymentDialog(
         confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
-}
-
-/** Editar todo lo de una tarjeta propia: datos, fechas, límite, presupuesto mensual y color. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun CardEditDialog(
-    card: mx.finanzas.pareja.data.Card,
-    errors: Map<CardField, String>,
-    onDismiss: () -> Unit,
-    onSave: (CardEditDraft) -> Unit,
-) {
-    var draft by remember(card.id) {
-        mutableStateOf(
-            CardDraft(
-                name = card.name, bank = card.bank, last4 = card.last4,
-                limitText = plainNumber(card.creditLimit),
-                cutoffText = card.cutoffDay.toString(), dueText = card.dueDay.toString(),
-            ),
-        )
-    }
-    var budgetText by remember(card.id) { mutableStateOf(card.monthlyBudget?.let(::plainNumber).orEmpty()) }
-    var color by remember(card.id) { mutableStateOf(card.color) }
-    var hasCashback by remember(card.id) { mutableStateOf(card.hasCashback) }
-
-    @Composable
-    fun field(label: String, value: String, field: CardField, keyboard: KeyboardType = KeyboardType.Text, onChange: (String) -> Unit) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onChange,
-            label = { Text(label) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-            isError = errors[field] != null,
-            supportingText = errors[field]?.let { { Text(it) } },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Editar tarjeta") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                field("Nombre", draft.name, CardField.NAME) { draft = draft.copy(name = it) }
-                field("Banco", draft.bank, CardField.BANK) { draft = draft.copy(bank = it) }
-                field("Últimos 4 dígitos", draft.last4, CardField.LAST4, KeyboardType.Number) { draft = draft.copy(last4 = it.take(4)) }
-                field("Límite de crédito", draft.limitText, CardField.LIMIT, KeyboardType.Decimal) { draft = draft.copy(limitText = it) }
-                field("Día de corte (1-31)", draft.cutoffText, CardField.CUTOFF, KeyboardType.Number) { draft = draft.copy(cutoffText = it) }
-                field("Día de pago (1-31)", draft.dueText, CardField.DUE, KeyboardType.Number) { draft = draft.copy(dueText = it) }
-                field("Presupuesto mensual (opcional)", budgetText, CardField.BUDGET, KeyboardType.Decimal) { budgetText = it }
-                Text(
-                    "Te avisamos a los dos cuando el gasto del mes lo supere. Las compras a meses cuentan por su " +
-                        "mensualidad. Déjalo vacío para no tener presupuesto.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Da cashback", Modifier.weight(1f))
-                    Switch(checked = hasCashback, onCheckedChange = { hasCashback = it })
-                }
-                Text("Color", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    // "Auto": el color de su banco.
-                    Box(
-                        Modifier.size(40.dp).clip(CircleShape)
-                            .border(if (color == null) 3.dp else 1.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                            .clickable { color = null },
-                        contentAlignment = Alignment.Center,
-                    ) { Text("Auto", style = MaterialTheme.typography.labelSmall) }
-                    CARD_COLOR_CHOICES.forEach { hex ->
-                        val selected = color.equals(hex, ignoreCase = true)
-                        Box(
-                            Modifier.size(40.dp).clip(CircleShape)
-                                .background(Color(android.graphics.Color.parseColor(hex)))
-                                .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                .clickable { color = hex },
-                        )
-                    }
-                }
-                errors[CardField.COLOR]?.let { ErrorText(it) }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(CardEditDraft(draft, budgetText, color, hasCashback)) }) { Text("Guardar") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-    )
-}
-
-/** Alta de tarjeta a pantalla completa: vista previa en vivo, datos de la tarjeta y su color. */
-@Composable
-private fun CardFormDialog(
-    errors: Map<CardField, String>,
-    onDismiss: () -> Unit,
-    onSave: (CardDraft) -> Unit,
-) {
-    var draft by remember { mutableStateOf(CardDraft()) }
-    val previewCard = mx.finanzas.pareja.data.Card(
-        id = "preview", householdId = "", ownerId = "",
-        name = draft.name.ifBlank { "Mi tarjeta" },
-        bank = draft.bank.ifBlank { "Banco" },
-        last4 = draft.last4.padEnd(4, '0'),
-        creditLimit = 0.0, cutoffDay = 1, dueDay = 1,
-        color = draft.color,
-    )
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        Box(Modifier.fillMaxSize().background(AppTheme.tokens.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Box(Modifier.fillMaxWidth().height(48.dp)) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text("Cancelar") }
-                    Text("Nueva tarjeta", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center))
-                }
-                CardFace(previewCard, front = true, onClick = null, modifier = Modifier.fillMaxWidth().height(170.dp))
-                AuthField("Apodo", draft.name, { draft = draft.copy(name = it) }, placeholder = "Ej. BBVA Azul", error = errors[CardField.NAME])
-                AuthField("Banco", draft.bank, { draft = draft.copy(bank = it) }, placeholder = "Ej. BBVA", error = errors[CardField.BANK])
-                AuthField(
-                    "Últimos 4 dígitos", draft.last4, { draft = draft.copy(last4 = it.filter(Char::isDigit).take(4)) },
-                    placeholder = "1234", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), error = errors[CardField.LAST4],
-                )
-                Text("Solo guardamos el apodo y los últimos 4 dígitos. Nunca el número completo.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f))
-                AuthField(
-                    "Límite de crédito", draft.limitText, { draft = draft.copy(limitText = it) },
-                    placeholder = "30000", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), error = errors[CardField.LIMIT],
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AuthField(
-                        "Día de corte", draft.cutoffText, { draft = draft.copy(cutoffText = it.filter(Char::isDigit).take(2)) },
-                        modifier = Modifier.weight(1f), placeholder = "1-31",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), error = errors[CardField.CUTOFF],
-                    )
-                    AuthField(
-                        "Día de pago", draft.dueText, { draft = draft.copy(dueText = it.filter(Char::isDigit).take(2)) },
-                        modifier = Modifier.weight(1f), placeholder = "1-31",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), error = errors[CardField.DUE],
-                    )
-                }
-                Text("COLOR", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val choices = listOf<String?>(null) + CARD_COLOR_CHOICES
-                    choices.forEach { hex ->
-                        val selected = draft.color == hex
-                        Box(
-                            Modifier.size(36.dp).clip(CircleShape)
-                                .background(if (hex == null) AppTheme.tokens.glass else Color(android.graphics.Color.parseColor(hex)))
-                                .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else AppTheme.tokens.glassBorder, CircleShape)
-                                .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.RadioButton) { draft = draft.copy(color = hex) },
-                            contentAlignment = Alignment.Center,
-                        ) { if (hex == null) Text("A", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-                    }
-                }
-            }
-            GradientButton(
-                onClick = { onSave(draft) },
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-            ) { Text("Guardar tarjeta") }
-        }
-    }
 }

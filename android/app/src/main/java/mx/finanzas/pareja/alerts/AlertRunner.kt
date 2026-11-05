@@ -39,7 +39,8 @@ object AlertRunner {
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
         val cards = repo.cards().filter { !it.archived }
 
-        val cycles = cards.filter { it.ownerId == userId }.map { card ->
+        // Débito no tiene corte ni pago: no genera avisos de ciclo (sí puede tener presupuesto).
+        val cycles = cards.filter { it.ownerId == userId && !it.isDebit }.map { card ->
             val current = repo.cycleEstimate(card.id, today)
             // El pago que sigue a un corte reciente vive en el ciclo anterior.
             val previous = current?.let { repo.cycleEstimate(card.id, it.cycleStart.minus(1, DateTimeUnit.DAY)) }
@@ -49,7 +50,7 @@ object AlertRunner {
             .map { CardMonthSpend(it, repo.cardMonthSpend(it.id, today)) }
 
         // Un pago ya cubierto no se avisa: se descartan los avisos de pago de los ciclos liquidados.
-        val settled = repo.cycleStatuses(cards.filter { it.ownerId == userId }.map { it.id }, today)
+        val settled = repo.cycleStatuses(cards.filter { it.ownerId == userId && !it.isDebit }.map { it.id }, today)
             .filterValues { it.isSettled }
             .map { (cardId, status) -> status.dueAlertKey(cardId) }
             .toSet()

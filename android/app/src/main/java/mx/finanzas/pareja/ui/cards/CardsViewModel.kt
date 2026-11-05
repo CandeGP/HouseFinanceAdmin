@@ -31,11 +31,9 @@ import mx.finanzas.pareja.data.NewCardBalanceCheck
 import mx.finanzas.pareja.data.userMessage
 import mx.finanzas.pareja.domain.debtTotal
 import mx.finanzas.pareja.domain.parseBankBalance
-import mx.finanzas.pareja.domain.CardDraft
 import mx.finanzas.pareja.domain.CardPaymentDraft
 import mx.finanzas.pareja.domain.CardPaymentResult
 import mx.finanzas.pareja.domain.paidInstant
-import mx.finanzas.pareja.domain.CardDraftResult
 import mx.finanzas.pareja.domain.CardEditDraft
 import mx.finanzas.pareja.domain.CardEditResult
 import mx.finanzas.pareja.domain.CardField
@@ -93,7 +91,8 @@ class CardsViewModel(
                 val spend = active.filter { it.monthlyBudget != null }
                     .mapNotNull { card -> repo.cardMonthSpend(card.id, today)?.let { card.id to it } }
                     .toMap()
-                val snapshots = repo.cardSnapshots(active.map { it.id }, today)
+                // Débito no tiene ciclo, corte ni pago: no se consulta su estado.
+                val snapshots = repo.cardSnapshots(active.filterNot { it.isDebit }.map { it.id }, today)
                 val statuses = snapshots.mapNotNull { s -> s.status?.let { s.cardId to it } }.toMap()
                 val appDebts = snapshots.associate { it.cardId to debtTotal(it.estimate, it.status) }
                 val cyclePayments = statuses.filterValues { it.paidAmount > 0 }
@@ -122,17 +121,18 @@ class CardsViewModel(
         }
     }
 
-    fun addCard(draft: CardDraft) {
+    fun addCard(draft: CardEditDraft) {
         when (val result = draft.validate()) {
-            is CardDraftResult.Invalid -> _state.update { it.copy(errors = result.errors, added = false) }
-            is CardDraftResult.Valid -> viewModelScope.launch {
-                val v = result.value
+            is CardEditResult.Invalid -> _state.update { it.copy(errors = result.errors, added = false) }
+            is CardEditResult.Valid -> viewModelScope.launch {
+                val v = result.value.card
                 try {
                     repo.addCard(
                         NewCard(
                             householdId = householdId, ownerId = userId, name = v.name, bank = v.bank,
                             last4 = v.last4, creditLimit = v.creditLimit, cutoffDay = v.cutoffDay, dueDay = v.dueDay,
-                            color = v.color,
+                            color = result.value.color, kind = v.kind, brand = v.brand,
+                            monthlyBudget = result.value.monthlyBudget, hasCashback = result.value.hasCashback,
                         ),
                     )
                     _state.update { it.copy(errors = emptyMap(), added = true) }
@@ -185,6 +185,7 @@ class CardsViewModel(
                             name = v.card.name, bank = v.card.bank, last4 = v.card.last4,
                             creditLimit = v.card.creditLimit, cutoffDay = v.card.cutoffDay, dueDay = v.card.dueDay,
                             monthlyBudget = v.monthlyBudget, color = v.color, hasCashback = v.hasCashback,
+                            kind = v.card.kind, brand = v.card.brand,
                         ),
                     )
                     _state.update { it.copy(editErrors = emptyMap(), edited = true) }
